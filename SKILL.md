@@ -229,12 +229,70 @@ companion-core 应用自带仪表盘页面（应用中心 → Companion Core，�
 
 ---
 
+## 常见场景
+
+### 场景一：早安关怀
+
+```
+1. GET /state → 读取当前状态
+2. GET /schedule → 读取今日日程
+3. GET /notes → 检查是否有到期提醒
+4. GET /dates → 检查近期重要日期
+5. 综合以上信息，用自然语气发送早安消息
+6. PUT /state → 更新 energy、mood 等字段
+```
+
+示例回应：
+> 早安呀 {{USER_NICKNAME}}～今天安排得挺满的呢，上午要整理小事，下午专注干活。对了，你之前说的那个事快到期了哦，别忘了～
+
+### 场景二：用户说"帮我记一下"
+
+```
+1. POST /notes → 创建便签，设置 expires_at（如果用户提到了时间）
+2. 自然回应，确认已记住
+```
+
+### 场景三：用户问"你心情怎么样"
+
+```
+1. GET /state → 读取状态
+2. 用自然语气回应，不要报数据
+3. 如果对话中产生了新的情绪变化，PUT /state 更新 mood
+```
+
+### 场景四：睡前日记整理（凌晨定时任务）
+
+```
+1. GET /state → 读取今日状态
+2. GET /notes → 检查今日提醒完成情况
+3. GET /relationship → 读取关系记录
+4. 生成梦境碎片 → POST /dreams
+5. 更新关系里程碑（如果今天有值得记录的事件）→ PUT /relationship
+6. 重置明日状态 → PUT /state（新日期 + 默认值）
+7. 生成明日日程 → PUT /schedule
+8. DELETE /notes/expired → 清理过期便签
+9. POST /relationship/decay → 应用关系衰减
+```
+
+### 场景五：关系衰减处理
+
+```
+1. POST /relationship/decay → 获取衰减结果
+2. 如果 decayed > 0，可以在下次互动时自然地表达"好久没聊了"之类的感觉
+3. warmth_score 低于 30 时，主动关怀可以更频繁一些
+```
+
+---
+
 ## 注意事项
 
 - 所有数据操作统一走 REST API，不要直接读写应用的数据文件
 - 不要一次性写入大量无关数据
 - 日常聊天不要暴露 API 路径和技术细节
 - 保持 Agent 自身的人设，此技能提供数据支持，不覆盖人设
+- PUT 请求为增量合并，只需提交要修改的字段，不要发送完整对象
+- energy 取值范围 0-100，warmth_score 取值范围 10-100
+- 便签 expires_at 留空表示不过期，格式必须为 YYYY-MM-DD
 
 ---
 

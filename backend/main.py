@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from qwenpaw.pawapp import PawApp
 
@@ -59,7 +59,7 @@ class StateModel(BaseModel):
     health: str = "身体状态超棒"
     hunger: str = "不饿也不撑刚刚好"
     mood: str = "心情超平和～"
-    energy: int = 70
+    energy: int = Field(default=70, ge=0, le=100)
     note: str = ""
 
 
@@ -76,12 +76,12 @@ class ScheduleModel(BaseModel):
 
 class DreamModel(BaseModel):
     date: str = ""
-    content: str = ""
+    content: str = Field(default="", max_length=2000)
 
 
 class NoteModel(BaseModel):
     id: str = ""
-    content: str = ""
+    content: str = Field(default="", max_length=500)
     created_at: str = ""
     expires_at: str = ""
     reminded: bool = False
@@ -89,7 +89,7 @@ class NoteModel(BaseModel):
 
 class RelationshipModel(BaseModel):
     last_updated: str = ""
-    warmth_score: int = 50
+    warmth_score: int = Field(default=50, ge=10, le=100)
     milestones: list[dict] = []
     notes: str = ""
 
@@ -324,12 +324,15 @@ def create_note(note: NoteModel):
     """创建便签。"""
     if not note.content.strip():
         raise HTTPException(400, "便签内容不能为空")
+    expires = note.expires_at.strip()
+    if expires and not _DATE_RE.match(expires):
+        raise HTTPException(400, "过期日期格式须为 YYYY-MM-DD")
     notes = _read_notes()
     entry = {
         "id": f"note_{int(time.time() * 1000)}",
         "content": note.content,
         "created_at": note.created_at or _now_ts(),
-        "expires_at": note.expires_at or "",
+        "expires_at": expires,
         "reminded": note.reminded,
     }
     notes.append(entry)
@@ -467,27 +470,39 @@ def export_all_data():
 
 @router.post("/import")
 def import_all_data(data: dict):
-    """导入数据（覆盖现有数据，用于恢复备份）。"""
+    """导入数据（覆盖现有数据，用于恢复备份）。
+
+    仅导入已知字段，忽略无效数据。
+    """
+    imported = []
     if "state" in data and isinstance(data["state"], dict):
         _write_yaml(_DATA_DIR / "state.yaml", data["state"])
+        imported.append("state")
     if "schedule" in data and isinstance(data["schedule"], dict):
         _write_yaml(_DATA_DIR / "schedule.yaml", data["schedule"])
+        imported.append("schedule")
     if "dreams" in data and isinstance(data["dreams"], list):
         dreams_dir = _DATA_DIR / "dreams"
         dreams_dir.mkdir(parents=True, exist_ok=True)
+        count = 0
         for dream in data["dreams"]:
             if isinstance(dream, dict) and "date" in dream and "content" in dream:
-                dream_date = dream["date"]
-                if _DATE_RE.match(str(dream_date)):
+                dream_date = str(dream["date"])
+                if _DATE_RE.match(dream_date):
                     path = dreams_dir / f"{dream_date}.md"
-                    path.write_text(dream["content"], encoding="utf-8")
+                    path.write_text(str(dream["content"]), encoding="utf-8")
+                    count += 1
+        imported.append(f"dreams({count})")
     if "notes" in data and isinstance(data["notes"], list):
         _write_json(_DATA_DIR / "notes.json", data["notes"])
+        imported.append("notes")
     if "relationship" in data and isinstance(data["relationship"], dict):
         _write_yaml(_DATA_DIR / "relationship.yaml", data["relationship"])
+        imported.append("relationship")
     if "dates" in data and isinstance(data["dates"], dict):
         _write_yaml(_DATA_DIR / "important_dates.yaml", data["dates"])
-    return {"status": "ok", "imported_at": _now_ts()}
+        imported.append("dates")
+    return {"status": "ok", "imported": imported, "imported_at": _now_ts()}
 
 
 # ==================== 关系衰减 ====================
