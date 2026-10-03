@@ -15,13 +15,16 @@
 - 💕 **关系记录** - 亲密度、里程碑、互动记录
 - 🎂 **重要日期** - 生日、纪念日管理
 - 🔌 **REST API** - 全部数据可通过 API 编程访问，搭配 companion_core 技能供 Agent 使用
-- 🤖 **Agent 工具** - 内置 `companion_get_state`/`companion_get_notes`/`companion_get_relationship` 工具，Agent 可直接调用
+- 🤖 **Agent 工具** - 内置 7 个智能体工具（读取状态/日程/便签/关系/日期，更新状态，创建便签），Agent 可直接调用
+- 🌙 **暗色模式** - 仪表盘自动跟随 QwenPaw 主题切换明暗模式
+- 💾 **数据管理** - 仪表盘内置导出/导入功能，一键备份与恢复
 - 🔒 **线程安全** - 所有数据读写加锁，原子写入防止数据损坏
 - 🌐 **中英双语** - 自动跟随 QwenPaw 的语言设置
 
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
+- v2.3.0：新增 4 个 Agent 工具（共 7 个）、动态系统提示、暗色模式、数据导出/导入 UI、日程编辑与梦境创建
 - v2.2.0：后端入口迁移至 `plugin.py`，数据目录统一为 `~/.qwenpaw/data/companion-core/`，新增 Agent 工具注册与系统提示注入
 - 从 1.x 升级：本版本由旧版 `general` 插件迁移为 `app` 类型 PawApp，API 前缀由 `/api/companion` 变更为 `/api/companion-core`。如需保留旧数据，将原工作区 `companion_data/` 中的文件复制到 `~/.qwenpaw/data/companion-core/` 即可。
 
@@ -75,8 +78,12 @@ qwenpaw app
 | 工具名 | 说明 |
 |--------|------|
 | `companion_get_state` | 读取当前状态（心情、精力、睡眠等） |
+| `companion_get_schedule` | 读取今日日程 |
 | `companion_get_notes` | 读取便签列表 |
 | `companion_get_relationship` | 读取关系记录（亲密度、里程碑） |
+| `companion_get_important_dates` | 读取重要日期（生日、纪念日） |
+| `companion_update_state` | 更新状态字段（心情、精力等） |
+| `companion_create_note` | 创建便签 |
 
 同时通过 `app.prompt_section` 注入系统提示，Agent 可在对话中自然访问陪伴数据。
 

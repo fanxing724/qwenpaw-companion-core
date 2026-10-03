@@ -50,7 +50,7 @@ from qwenpaw.pawapp import PawApp
 
 logger = logging.getLogger(__name__)
 
-PLUGIN_VERSION = "2.2.0"
+PLUGIN_VERSION = "2.3.0"
 PLUGIN_NAME = "陪伴核心"
 PLUGIN_ID = "companion-core"
 
@@ -682,14 +682,187 @@ async def companion_get_relationship():
     return _text_response(text)
 
 
+@app.tool(
+    "companion_get_schedule",
+    description="读取「陪伴核心」的今日日程。当用户询问今天有什么安排时调用。",
+    icon="📅",
+    tool_type="internal",
+    target_param="",
+)
+async def companion_get_schedule():
+    """读取今日日程并返回自然语言描述。"""
+    with _lock:
+        data = _read_yaml(_DATA_DIR / "schedule.yaml")
+    if not data:
+        data = ScheduleModel().model_dump()
+    plan = data.get("plan", [])
+    date_str = data.get("date", "未知日期")
+    if not plan:
+        return _text_response(f"今天（{date_str}）还没有安排。")
+    lines = [f"今日日程（{date_str}）："]
+    for item in plan:
+        lines.append(f"  {item.get('time', '')} - {item.get('activity', '')}（{item.get('mood', '')}）")
+    return _text_response("\n".join(lines))
+
+
+@app.tool(
+    "companion_update_state",
+    description="更新「陪伴核心」的状态。当对话中产生了情绪变化、用户问候后"
+                "需要更新心情/精力等状态时调用。仅提交要修改的字段。",
+    icon="🌤",
+    tool_type="internal",
+    target_param="",
+)
+async def companion_update_state(
+    mood: str = "",
+    energy: int = -1,
+    sleep: str = "",
+    health: str = "",
+    hunger: str = "",
+    dream: str = "",
+    note: str = "",
+):
+    """增量更新状态字段。"""
+    patch = {}
+    if mood:
+        patch["mood"] = mood
+    if energy >= 0:
+        patch["energy"] = max(0, min(100, energy))
+    if sleep:
+        patch["sleep"] = sleep
+    if health:
+        patch["health"] = health
+    if hunger:
+        patch["hunger"] = hunger
+    if dream:
+        patch["dream"] = dream
+    if note:
+        patch["note"] = note
+    if not patch:
+        return _text_response("没有要更新的字段。")
+    with _lock:
+        path = _DATA_DIR / "state.yaml"
+        existing = _read_yaml(path)
+        merged = {**existing, **patch, "date": _today_str()}
+        _write_yaml(path, merged)
+    fields = "、".join(patch.keys())
+    return _text_response(f"已更新状态：{fields}。")
+
+
+@app.tool(
+    "companion_create_note",
+    description="创建一条便签。当用户说「帮我记一下」「提醒我」时调用。",
+    icon="📝",
+    tool_type="internal",
+    target_param="",
+)
+async def companion_create_note(content: str, expires_at: str = ""):
+    """创建一条便签。expires_at 为可选的过期日期（YYYY-MM-DD）。"""
+    if not content.strip():
+        return _text_response("便签内容不能为空。")
+    if expires_at and not _DATE_RE.match(expires_at):
+        return _text_response("过期日期格式须为 YYYY-MM-DD。")
+    with _lock:
+        notes = _read_notes()
+        entry = {
+            "id": f"note_{int(time.time() * 1000)}",
+            "content": content.strip(),
+            "created_at": _now_ts(),
+            "expires_at": expires_at,
+            "reminded": False,
+        }
+        notes.append(entry)
+        _write_json(_DATA_DIR / "notes.json", notes)
+    return _text_response(f"已记住：{content.strip()}")
+
+
+@app.tool(
+    "companion_get_important_dates",
+    description="读取「陪伴核心」的重要日期（生日、纪念日等）。"
+                "在主动关怀前或用户提及相关话题时调用。",
+    icon="🎂",
+    tool_type="internal",
+    target_param="",
+)
+async def companion_get_important_dates():
+    """读取重要日期并返回自然语言描述。"""
+    with _lock:
+        data = _read_yaml(_DATA_DIR / "important_dates.yaml")
+    if not data or "dates" not in data:
+        return _text_response("还没有记录重要日期。")
+    dates = data["dates"]
+    if not dates:
+        return _text_response("还没有记录重要日期。")
+    today = date.today()
+    lines = ["重要日期："]
+    for d in dates:
+        name = d.get("name", "")
+        dt = d.get("date", "")
+        note = d.get("note", "")
+        suffix = ""
+        try:
+            d_date = datetime.strptime(dt[:10], "%Y-%m-%d").date()
+            delta = (d_date.replace(year=today.year) - today).days
+            if delta < 0:
+                delta = (d_date.replace(year=today.year + 1) - today).days
+            if delta == 0:
+                suffix = "（就是今天！）"
+            elif delta <= 7:
+                suffix = f"（还有 {delta} 天）"
+        except Exception:  # noqa: BLE001
+            pass
+        line = f"  - {dt} {name}"
+        if note:
+            line += f"（{note}）"
+        line += suffix
+        lines.append(line)
+    return _text_response("\n".join(lines))
+
+
+def _build_prompt(agent) -> str:
+    """动态构建系统提示，包含当前数据摘要。"""
+    today = _today_str()
+    parts = [
+        "【陪伴核心系统】用户安装了陪伴核心插件。你可以通过以下工具访问陪伴数据：",
+        "- companion_get_state: 读取当前状态",
+        "- companion_get_schedule: 读取今日日程",
+        "- companion_get_notes: 读取便签列表",
+        "- companion_get_relationship: 读取关系记录",
+        "- companion_get_important_dates: 读取重要日期",
+        "- companion_update_state: 更新状态",
+        "- companion_create_note: 创建便签",
+        "当用户询问你的状态、心情、便签、日程或关系时，请调用相应工具获取数据后自然回应。",
+        "保持人设语气，不要暴露技术细节。",
+    ]
+    with _lock:
+        notes = _read_notes()
+    active_notes = [n for n in notes if not _is_expired(n, today)]
+    if active_notes:
+        parts.append(f"\n当前有 {len(active_notes)} 条活跃便签。")
+    try:
+        dates_data = _read_yaml(_DATA_DIR / "important_dates.yaml")
+        dates_list = dates_data.get("dates", []) if dates_data else []
+        today_d = date.today()
+        for d in dates_list:
+            dt_str = d.get("date", "")
+            try:
+                d_date = datetime.strptime(dt_str[:10], "%Y-%m-%d").date()
+                anniversary = d_date.replace(year=today_d.year)
+                if anniversary < today_d:
+                    anniversary = d_date.replace(year=today_d.year + 1)
+                delta = (anniversary - today_d).days
+                if 0 <= delta <= 7:
+                    parts.append(f"\n提醒：{d.get('name', '')}（{dt_str}）还有 {delta} 天。")
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception:  # noqa: BLE001
+        pass
+    return "\n".join(parts)
+
+
 app.prompt_section(
     "companion_core",
-    "【陪伴核心系统】用户安装了陪伴核心插件。你可以通过以下工具访问陪伴数据：\n"
-    "- companion_get_state: 读取当前状态\n"
-    "- companion_get_notes: 读取便签列表\n"
-    "- companion_get_relationship: 读取关系记录\n"
-    "当用户询问你的状态、心情、便签或关系时，请调用相应工具获取数据后自然回应。"
-    "保持人设语气，不要暴露技术细节。",
+    _build_prompt,
     after="workspace",
     priority=200,
 )
@@ -697,8 +870,15 @@ app.prompt_section(
 
 @app.on_launch
 async def init_companion():
-    """Seed the data directory on app launch."""
+    """Seed the data directory on app launch and clean up stale data."""
     await asyncio.to_thread(_seed_data)
+    with _lock:
+        notes = _read_notes()
+        today = _today_str()
+        valid = [n for n in notes if not _is_expired(n, today)]
+        if len(valid) < len(notes):
+            _write_json(_DATA_DIR / "notes.json", valid)
+            logger.info("[companion] Cleaned %d expired note(s) on startup", len(notes) - len(valid))
     logger.info("[companion] v%s loaded, data dir: %s", PLUGIN_VERSION, _DATA_DIR)
     logger.info(
         "[companion] API endpoints: /state, /schedule, /dreams, "

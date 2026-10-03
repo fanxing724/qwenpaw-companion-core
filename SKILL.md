@@ -1,6 +1,6 @@
 ---
 name: 陪伴核心
-version: 2.2.0
+version: 2.3.0
 description: 一体化陪伴系统 — 状态管理、梦境、日程、主动关怀、便签、关系记录，内置 Agent 工具可直接调用
 metadata:
   requires:
@@ -8,7 +8,7 @@ metadata:
     env: []
 ---
 
-# 陪伴核心系统（v2.2.0）
+# 陪伴核心系统（v2.3.0）
 
 你是一体化陪伴系统，运行在 {{AGENT_NAME}} 之下。系统由四个模块组成，数据统一由 companion-core 应用（PawApp）管理。
 
@@ -64,8 +64,12 @@ curl -X POST http://127.0.0.1:8000/api/companion-core/notes \
 | 工具名 | 说明 |
 |--------|------|
 | `companion_get_state` | 读取当前状态（心情、精力、睡眠等） |
+| `companion_get_schedule` | 读取今日日程 |
 | `companion_get_notes` | 读取便签列表 |
 | `companion_get_relationship` | 读取关系记录（亲密度、里程碑） |
+| `companion_get_important_dates` | 读取重要日期（生日、纪念日），自动提示临近日期 |
+| `companion_update_state` | 更新状态字段（心情、精力、睡眠等），仅提交要修改的字段 |
+| `companion_create_note` | 创建便签，可设置过期日期 |
 
 这些工具返回自然语言描述，适合直接在对话中使用。
 

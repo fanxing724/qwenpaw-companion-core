@@ -5,6 +5,26 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.3.0] - 2026-10-03
+
+### 新增
+- Agent 工具：`companion_get_schedule`（读取日程）、`companion_update_state`（更新状态）、`companion_create_note`（创建便签）、`companion_get_important_dates`（读取重要日期）
+- 动态系统提示（`prompt_section` 改为 callable），自动注入活跃便签数量和临近重要日期提醒
+- 前端仪表盘新增「数据」标签页，支持一键导出 JSON 备份与从文件导入恢复
+- 前端新增日程编辑功能（添加/删除日程条目）
+- 前端新增梦境创建功能（写梦 Modal）
+- 前端新增关系记录编辑功能（内联编辑 notes 字段）
+- 启动时自动清理过期便签
+
+### 改进
+- 前端适配暗色模式（`host.useTheme()`），自动跟随 QwenPaw 主题切换
+- 前端 API 调用改用 `host.fetch`，自动携带认证信息
+- `plugin.json` 新增 `meta.tools` 工具声明，应用中心可展示工具列表
+
+### 技术
+- Agent 工具总数从 3 个增至 7 个（4 读 + 2 写 + 1 关系读取）
+- `_build_prompt(agent)` 函数动态构建系统提示，包含当日数据摘要
+
 ## [2.2.0] - 2026-10-03
 
 ### 变更
