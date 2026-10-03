@@ -197,8 +197,8 @@
 
   // ── API helpers ──────────────────────────────────────────────────────
 
-  // 宿主 getApiUrl 是否自动补 /api 前缀在不同 QwenPaw 版本里行为不一致：
-  // 传一个探针路径看返回值，据此决定要不要自己带 /api，避免整站 404。
+  // 宿主是否自动补 /api 前缀在不同 QwenPaw 版本间不一致（文档亦互相矛盾），
+  // 写死任一种都会在另一类宿主上 404，故启动时探测一次再自适应。
   var API_PREFIX = (function () {
     try {
       var probe = String(host.getApiUrl("/__cp_probe__") || "");
