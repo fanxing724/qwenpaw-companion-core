@@ -143,23 +143,14 @@
 
   function apiFetch(path, opts) {
     opts = opts || {};
-    if (host.fetch) {
-      var fetchOpts = { method: opts.method || "GET" };
-      if (opts.body) {
-        fetchOpts.headers = { "Content-Type": "application/json" };
-        fetchOpts.body = JSON.stringify(opts.body);
-      }
-      return host.fetch(path, fetchOpts).then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.status === 204 ? null : res.json();
-      });
-    }
-    var shortPath = path.replace(/^\/api/, "");
-    var url = host.getApiUrl(shortPath);
-    var headers = Object.assign({}, opts.headers);
+    var url = host.getApiUrl(path);
+    var token = host.getApiToken ? host.getApiToken() : "";
+    var headers = opts.headers || {};
     headers["Content-Type"] = "application/json";
+    if (token) headers["Authorization"] = "Bearer " + token;
     return fetch(url, {
-      method: opts.method || "GET", headers: headers,
+      method: opts.method || "GET",
+      headers: headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     }).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
@@ -168,26 +159,26 @@
   }
 
   var api = {
-    getState: function () { return apiFetch("/api/companion-core/state"); },
-    updateState: function (d) { return apiFetch("/api/companion-core/state", { method: "PUT", body: d }); },
-    getSchedule: function () { return apiFetch("/api/companion-core/schedule"); },
-    updateSchedule: function (d) { return apiFetch("/api/companion-core/schedule", { method: "PUT", body: d }); },
-    listDreams: function () { return apiFetch("/api/companion-core/dreams"); },
-    getDream: function (d) { return apiFetch("/api/companion-core/dreams/" + encodeURIComponent(d)); },
-    createDream: function (d) { return apiFetch("/api/companion-core/dreams", { method: "POST", body: d }); },
-    listNotes: function (exp) { return apiFetch("/api/companion-core/notes?expired=" + (exp ? "true" : "false")); },
-    createNote: function (d) { return apiFetch("/api/companion-core/notes", { method: "POST", body: d }); },
-    updateNote: function (id, d) { return apiFetch("/api/companion-core/notes/" + encodeURIComponent(id), { method: "PUT", body: d }); },
-    deleteNote: function (id) { return apiFetch("/api/companion-core/notes/" + encodeURIComponent(id), { method: "DELETE" }); },
-    cleanExpiredNotes: function () { return apiFetch("/api/companion-core/notes/expired", { method: "DELETE" }); },
-    getRelationship: function () { return apiFetch("/api/companion-core/relationship"); },
-    updateRelationship: function (d) { return apiFetch("/api/companion-core/relationship", { method: "PUT", body: d }); },
-    getDates: function () { return apiFetch("/api/companion-core/dates"); },
-    addDate: function (d) { return apiFetch("/api/companion-core/dates", { method: "POST", body: d }); },
-    deleteDate: function (n) { return apiFetch("/api/companion-core/dates/" + encodeURIComponent(n), { method: "DELETE" }); },
-    exportAll: function () { return apiFetch("/api/companion-core/export"); },
-    importAll: function (d) { return apiFetch("/api/companion-core/import", { method: "POST", body: d }); },
-    health: function () { return apiFetch("/api/companion-core/health"); },
+    getState: function () { return apiFetch("/companion-core/state"); },
+    updateState: function (d) { return apiFetch("/companion-core/state", { method: "PUT", body: d }); },
+    getSchedule: function () { return apiFetch("/companion-core/schedule"); },
+    updateSchedule: function (d) { return apiFetch("/companion-core/schedule", { method: "PUT", body: d }); },
+    listDreams: function () { return apiFetch("/companion-core/dreams"); },
+    getDream: function (d) { return apiFetch("/companion-core/dreams/" + encodeURIComponent(d)); },
+    createDream: function (d) { return apiFetch("/companion-core/dreams", { method: "POST", body: d }); },
+    listNotes: function (exp) { return apiFetch("/companion-core/notes?expired=" + (exp ? "true" : "false")); },
+    createNote: function (d) { return apiFetch("/companion-core/notes", { method: "POST", body: d }); },
+    updateNote: function (id, d) { return apiFetch("/companion-core/notes/" + encodeURIComponent(id), { method: "PUT", body: d }); },
+    deleteNote: function (id) { return apiFetch("/companion-core/notes/" + encodeURIComponent(id), { method: "DELETE" }); },
+    cleanExpiredNotes: function () { return apiFetch("/companion-core/notes/expired", { method: "DELETE" }); },
+    getRelationship: function () { return apiFetch("/companion-core/relationship"); },
+    updateRelationship: function (d) { return apiFetch("/companion-core/relationship", { method: "PUT", body: d }); },
+    getDates: function () { return apiFetch("/companion-core/dates"); },
+    addDate: function (d) { return apiFetch("/companion-core/dates", { method: "POST", body: d }); },
+    deleteDate: function (n) { return apiFetch("/companion-core/dates/" + encodeURIComponent(n), { method: "DELETE" }); },
+    exportAll: function () { return apiFetch("/companion-core/export"); },
+    importAll: function (d) { return apiFetch("/companion-core/import", { method: "POST", body: d }); },
+    health: function () { return apiFetch("/companion-core/health"); },
   };
 
   // ── Shared UI pieces ─────────────────────────────────────────────────
