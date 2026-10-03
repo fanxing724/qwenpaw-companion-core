@@ -15,12 +15,15 @@
 - 💕 **关系记录** - 亲密度、里程碑、互动记录
 - 🎂 **重要日期** - 生日、纪念日管理
 - 🔌 **REST API** - 全部数据可通过 API 编程访问，搭配 companion_core 技能供 Agent 使用
+- 🤖 **Agent 工具** - 内置 `companion_get_state`/`companion_get_notes`/`companion_get_relationship` 工具，Agent 可直接调用
+- 🔒 **线程安全** - 所有数据读写加锁，原子写入防止数据损坏
 - 🌐 **中英双语** - 自动跟随 QwenPaw 的语言设置
 
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
-- 从 1.x 升级：本版本由旧版 `general` 插件迁移为 `app` 类型 PawApp，API 前缀由 `/api/companion` 变更为 `/api/companion-core`，数据目录变更为应用安装目录下的 `data/`。如需保留旧数据，将原工作区 `companion_data/` 中的文件复制到应用的 `data/` 目录即可。
+- v2.2.0：后端入口迁移至 `plugin.py`，数据目录统一为 `~/.qwenpaw/data/companion-core/`，新增 Agent 工具注册与系统提示注入
+- 从 1.x 升级：本版本由旧版 `general` 插件迁移为 `app` 类型 PawApp，API 前缀由 `/api/companion` 变更为 `/api/companion-core`。如需保留旧数据，将原工作区 `companion_data/` 中的文件复制到 `~/.qwenpaw/data/companion-core/` 即可。
 
 ## 🚀 安装
 
@@ -64,6 +67,18 @@ qwenpaw app
 | `/api/companion-core/export` | GET | 导出所有数据（备份） |
 | `/api/companion-core/import` | POST | 导入数据（恢复） |
 | `/api/companion-core/health` | GET | 健康检查 |
+
+## 🤖 Agent 工具
+
+插件自动注册以下智能体工具（无需 HTTP 请求，Agent 可直接调用）：
+
+| 工具名 | 说明 |
+|--------|------|
+| `companion_get_state` | 读取当前状态（心情、精力、睡眠等） |
+| `companion_get_notes` | 读取便签列表 |
+| `companion_get_relationship` | 读取关系记录（亲密度、里程碑） |
+
+同时通过 `app.prompt_section` 注入系统提示，Agent 可在对话中自然访问陪伴数据。
 
 ## 🗂 数据存储
 
