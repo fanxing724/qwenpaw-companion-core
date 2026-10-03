@@ -56,6 +56,18 @@ curl -X POST http://127.0.0.1:8000/api/companion-core/notes \
 
 （端口以实际 QwenPaw 服务为准。）
 
+### 智能体工具
+
+除了 REST API，系统还注册了以下智能体工具（可直接调用，无需构造 HTTP 请求）：
+
+| 工具名 | 说明 |
+|--------|------|
+| `companion_get_state` | 读取当前状态（心情、精力、睡眠等） |
+| `companion_get_notes` | 读取便签列表 |
+| `companion_get_relationship` | 读取关系记录（亲密度、里程碑） |
+
+这些工具返回自然语言描述，适合直接在对话中使用。
+
 ---
 
 ## 模块一：状态管理（state）

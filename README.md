@@ -67,10 +67,9 @@ qwenpaw app
 
 ## 🗂 数据存储
 
-数据存储在用户数据目录（跨平台，插件更新不会丢失数据）：
+数据存储在 `~/.qwenpaw/data/companion-core/`（插件目录之外，覆盖安装不丢数据）：
 
-- **Windows**: `%APPDATA%/qwenpaw/companion-core/`
-- **Linux/Mac**: `~/.local/share/qwenpaw/companion-core/`
+- **默认路径**: `~/.qwenpaw/data/companion-core/`
 - **自定义**: 设置环境变量 `QWENPAW_COMPANION_DATA=/path/to/data`
 
 ```
@@ -140,9 +139,8 @@ companion-core/
 ```
 companion-core/
 ├── plugin.json          # 插件清单（PawApp app 类型）
+├── plugin.py            # FastAPI + PawApp 后端
 ├── requirements.txt     # Python 依赖
-├── backend/
-│   └── main.py          # FastAPI + PawApp 后端
 ├── ui/
 │   └── index.js         # 仪表盘前端（React + antd，宿主运行时加载）
 ├── SKILL.md             # 陪伴技能模板（需自定义）

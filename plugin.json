@@ -1,33 +1,41 @@
 {
   "id": "companion-core",
   "name": "陪伴核心",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Integrated companion system — state tracking, dreams, schedule, notes, relationship and important dates, with a dashboard UI and REST API for agents.",
   "description_i18n": {
     "zh-CN": "一体化陪伴系统 — 状态管理、梦境、日程、便签、关系记录与重要日期，提供可视化仪表盘和供 Agent 调用的 REST API。",
     "en-US": "Integrated companion system — state tracking, dreams, schedule, notes, relationship and important dates, with a dashboard UI and REST API for agents."
   },
   "author": "QwenPaw Community",
+  "license": "MIT",
   "type": "app",
-  "entry": {
-    "backend": "backend/main.py",
-    "frontend": "ui/index.js"
-  },
-  "dependencies": ["pyyaml>=6.0"],
   "qwenpaw_version": {
     "min": "2.0.1"
   },
+  "min_version": "2.0.1",
+  "entry": {
+    "backend": "plugin.py",
+    "frontend": "ui/index.js"
+  },
+  "menu": {
+    "label": "陪伴核心",
+    "icon": "💞",
+    "description": "一体化陪伴系统：状态管理、梦境、日程、便签、关系记录与重要日期",
+    "location": "primary.settings"
+  },
+  "permissions": [
+    "workspace.read",
+    "workspace.write"
+  ],
   "meta": {
+    "category": "lifestyle",
+    "icon": "💞",
     "pawapp": {
       "icon": "💞",
       "category": "lifestyle",
       "entry_page": "/apps/companion-core",
       "launch_scope": "page"
-    },
-    "permissions": {
-      "chat": false,
-      "storage": true
-    },
-    "settings": []
+    }
   }
 }

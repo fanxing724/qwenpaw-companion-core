@@ -5,6 +5,28 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.2.0] - 2026-10-03
+
+### 变更
+- 后端入口从 `backend/main.py` 迁移至根目录 `plugin.py`，对齐 QwenPaw 参考插件结构
+- 数据目录统一为 `~/.qwenpaw/data/companion-core/`（与参考插件一致的外部存储路径）
+- `plugin.json` 结构对齐参考插件：新增 `menu`、`license`、`min_version`，`permissions` 改为数组
+
+### 新增
+- Agent 工具注册（`@app.tool`，tool_type=internal）：`companion_get_state`、`companion_get_notes`、`companion_get_relationship`
+- 系统提示注入（`app.prompt_section`），Agent 可自然语言访问陪伴数据
+- `_text_response()` 辅助函数，兼容 agentscope ToolResponse
+
+### 改进
+- 所有数据读写操作加 `threading.Lock`，保证线程安全
+- YAML/JSON 写入改为原子操作（tmp 文件 + `os.replace`），防止写入中断导致数据损坏
+- 添加 `@app.hook("shutdown")` 生命周期管理
+
+### 技术
+- 删除 `backend/` 目录，单文件 `plugin.py` 承载全部后端逻辑
+- 模块级常量 `PLUGIN_VERSION`、`PLUGIN_NAME`、`PLUGIN_ID`
+- `plugin.json` 新增 `meta.category`、`meta.icon` 顶层字段
+
 ## [2.1.0] - 2026-10-03
 
 ### 新增
