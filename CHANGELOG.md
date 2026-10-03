@@ -5,6 +5,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 修复
+- 中文宿主下界面仍显示英文：官方文档规定 `host.useLocale()` 返回对象 `{ locale: "zh-CN", messages: {...} }`，而代码按字符串解析，导致永远判定为非中文。现同时兼容对象（读 `locale` / `language`）与字符串两种形态，并在模拟测试中双向校验
+
 ## [2.3.1] - 2026-10-03
 
 ### 修复

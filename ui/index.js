@@ -119,8 +119,11 @@
     }
   };
 
+  // host.useLocale() 在文档里是对象 { locale: "zh-CN", ... }，实测宿主可能
+  // 直接回字符串，两种形态都要收敛成 zh / en。
   function normalizeLocale(v) {
-    return String(v || "").toLowerCase().split("-")[0] === "zh" ? "zh" : "en";
+    var s = v && typeof v === "object" ? String(v.locale || v.language || "") : String(v || "");
+    return /^zh/i.test(s.trim()) ? "zh" : "en";
   }
 
   function tr(locale, key, values) {
