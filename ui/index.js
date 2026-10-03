@@ -29,6 +29,7 @@
   var Popconfirm = antd.Popconfirm;
   var Progress = antd.Progress;
   var Space = antd.Space;
+  var Spin = antd.Spin;
   var Switch = antd.Switch;
   var Tabs = antd.Tabs;
   var Tag = antd.Tag;
@@ -72,6 +73,10 @@
       importSuccess: "数据导入成功，已恢复: {fields}",
       exportSuccess: "数据已导出", importFailed: "导入失败: {error}",
       timeRequired: "请填写时间", activityRequired: "请填写活动",
+      retry: "重试", loading: "加载中…", loadError: "读取失败",
+      healthStatus: "状态", healthDreams: "梦境", healthNotes: "便签",
+      importConfirm: "导入将覆盖现有数据，确定继续？",
+      isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
       appTitle: "Companion Core", appSubtitle: "State · Schedule · Dreams · Notes · Relationship · Dates · Data",
@@ -107,6 +112,10 @@
       importSuccess: "Import successful, restored: {fields}",
       exportSuccess: "Data exported", importFailed: "Import failed: {error}",
       timeRequired: "Enter the time", activityRequired: "Enter the activity",
+      retry: "Retry", loading: "Loading…", loadError: "Failed to load",
+      healthStatus: "Status", healthDreams: "Dreams", healthNotes: "Notes",
+      importConfirm: "Import overwrites existing data. Continue?",
+      isToday: "Today", tomorrow: "Tomorrow", inDays: "in {count} days",
     }
   };
 
@@ -122,6 +131,53 @@
   }
 
   function isValidDate(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")); }
+
+  // 后端按本地日期存 key，前端也必须用本地日期：toISOString 是 UTC，
+  // 东八区每天 0-8 点会少算一天。
+  function localToday() {
+    var d = new Date();
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + "-" + (m < 10 ? "0" + m : m) + "-" + (day < 10 ? "0" + day : day);
+  }
+
+  // ── Data loading ─────────────────────────────────────────────────────
+
+  // loader 只在 deps 变化或 retry() 后重跑；alive 标记避免切换标签页后
+  // 迟到的响应写到已卸载组件上。
+  function useAsync(loader, deps) {
+    var _s = useState({ data: null, error: null, loading: true }), st = _s[0], setSt = _s[1];
+    var _r = useState(0), attempt = _r[0], setAttempt = _r[1];
+    var loaderRef = React.useRef(loader);
+    loaderRef.current = loader;
+    useEffect(function () {
+      var alive = true;
+      setSt({ data: null, error: null, loading: true });
+      loaderRef.current().then(function (d) {
+        if (alive) setSt({ data: d, error: null, loading: false });
+      }).catch(function (e) {
+        if (alive) setSt({ data: null, error: e, loading: false });
+      });
+      return function () { alive = false; };
+    }, (deps || []).concat([attempt]));
+    return {
+      data: st.data, error: st.error, loading: st.loading,
+      retry: function () { setAttempt(attempt + 1); },
+    };
+  }
+
+  function LoadingBlock(props) {
+    return h("div", { style: { padding: 40, textAlign: "center" } },
+      h(Spin, {}),
+      h("div", { style: { color: props.C.muted, fontSize: 12, marginTop: 10 } }, props.t("loading")));
+  }
+
+  function ErrorBlock(props) {
+    var detail = props.error && props.error.message ? props.error.message : String(props.error || "");
+    return h("div", { style: { padding: 36, textAlign: "center" } },
+      h("div", { style: { color: props.C.sub, fontSize: 13, marginBottom: 4 } }, props.t("loadError")),
+      h("div", { style: { color: props.C.muted, fontSize: 12, marginBottom: 12 } }, detail),
+      h(Button, { size: "small", onClick: props.onRetry }, props.t("retry")));
+  }
 
   // ── Theme ────────────────────────────────────────────────────────────
 
@@ -221,16 +277,17 @@
 
   function StateTab(props) {
     var t = props.t, C = props.C;
-    var _d = useState(null), data = _d[0], setData = _d[1];
+    var s = useAsync(api.getState, []);
     var _e = useState(false), editing = _e[0], setEditing = _e[1];
     var _f = useState(null), form = _f[0], setForm = _f[1];
+    var _g = useState(false), saving = _g[0], setSaving = _g[1];
 
-    function load() {
-      api.getState().then(setData).catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
+    if (s.loading) return h(LoadingBlock, { t: t, C: C });
+    if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
+    var data = s.data || {};
+    if (!data.date && !data.mood) {
+      return h("div", { style: { padding: 32, textAlign: "center" } }, h(Empty, { description: t("noState") }));
     }
-    useEffect(load, []);
-
-    if (!data) return h("div", { style: { padding: 32, textAlign: "center" } }, h(Empty, { description: t("noState") }));
 
     var energy = typeof data.energy === "number" ? data.energy : 0;
 
@@ -238,11 +295,20 @@
       setForm(Object.assign({}, form, (function () { var o = {}; o[key] = value; return o; })()));
     }
 
+    function submit() {
+      if (saving) return;
+      setSaving(true);
+      api.updateState(form)
+        .then(function () { message.success(t("saved")); setEditing(false); s.retry(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setSaving(false); });
+    }
+
     return h("div", {},
       h(Toolbar, {
         left: h("span", { style: { color: C.sub, fontSize: 13 } }, t("fDate") + ": " + (data.date || "—")),
         right: h(Space, {},
-          h(Button, { size: "small", onClick: load }, t("refresh")),
+          h(Button, { size: "small", onClick: s.retry }, t("refresh")),
           h(Button, { size: "small", type: "primary", onClick: function () { setForm(Object.assign({}, data)); setEditing(true); } }, t("edit"))),
       }),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 } },
@@ -258,11 +324,9 @@
           h(Field, { label: t("fNote"), C: C }, data.note || "—"))),
       h(Modal, {
         open: editing, title: t("edit"), okText: t("save"), cancelText: t("cancel"),
+        okButtonProps: { loading: saving },
         onCancel: function () { setEditing(false); },
-        onOk: function () {
-          api.updateState(form).then(function () { message.success(t("saved")); setEditing(false); load(); })
-            .catch(function (e) { message.error(t("saveFailed", { error: e.message })); });
-        },
+        onOk: submit,
       }, form ? h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
         h(EditorRow, { label: t("fMood"), C: C }, h(Input, { value: form.mood, onChange: function (e) { setField("mood", e.target.value); } })),
         h(EditorRow, { label: t("fSleep"), C: C }, h(Input, { value: form.sleep, onChange: function (e) { setField("sleep", e.target.value); } })),
@@ -277,39 +341,48 @@
 
   function ScheduleTab(props) {
     var t = props.t, C = props.C;
-    var _d = useState(null), data = _d[0], setData = _d[1];
+    var s = useAsync(api.getSchedule, []);
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ time: "", activity: "", mood: "" }), form = _f[0], setForm = _f[1];
+    var _g = useState(false), saving = _g[0], setSaving = _g[1];
 
-    function load() {
-      api.getSchedule().then(setData).catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
+    if (s.loading) return h(LoadingBlock, { t: t, C: C });
+    if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
+
+    var data = s.data || {};
+    var plan = ((data.plan || []).slice()).sort(function (a, b) {
+      return String(a.time || "99:99").localeCompare(String(b.time || "99:99"));
+    });
+
+    function savePlan(next, msgKey, after) {
+      if (saving) return;
+      setSaving(true);
+      api.updateSchedule({ plan: next })
+        .then(function () { message.success(t(msgKey)); if (after) after(); s.retry(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setSaving(false); });
     }
-    useEffect(load, []);
-
-    var plan = (data && data.plan) || [];
 
     function addItem() {
       if (!form.time.trim()) { message.warning(t("timeRequired")); return; }
       if (!form.activity.trim()) { message.warning(t("activityRequired")); return; }
-      var newPlan = plan.concat([{ time: form.time.trim(), activity: form.activity.trim(), mood: form.mood.trim() || "平稳" }]);
-      api.updateSchedule({ plan: newPlan })
-        .then(function () { message.success(t("saved")); setModalOpen(false); setForm({ time: "", activity: "", mood: "" }); load(); })
-        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); });
+      var entry = { time: form.time.trim(), activity: form.activity.trim(), mood: form.mood.trim() || "平稳" };
+      savePlan(plan.concat([entry]), "saved", function () {
+        setModalOpen(false);
+        setForm({ time: "", activity: "", mood: "" });
+      });
     }
 
     function removeItem(idx) {
-      var newPlan = plan.filter(function (_, i) { return i !== idx; });
-      api.updateSchedule({ plan: newPlan })
-        .then(function () { message.success(t("deleted")); load(); })
-        .catch(function (e) { message.error(t("deleteFailed", { error: e.message })); });
+      savePlan(plan.filter(function (_, i) { return i !== idx; }), "deleted");
     }
 
     return h("div", {},
       h(Toolbar, {
         left: h(Space, {},
           h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); } }, t("newSchedule")),
-          h("span", { style: { color: C.sub, fontSize: 13 } }, (data && data.date) ? data.date : "")),
-        right: h(Button, { size: "small", onClick: load }, t("refresh")),
+          h("span", { style: { color: C.sub, fontSize: 13 } }, data.date || "")),
+        right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
       h("div", { style: panelStyle(C) },
         plan.length === 0
@@ -323,10 +396,11 @@
                 h("span", { style: { flex: 1, color: C.text, fontSize: 13 } }, item.activity || ""),
                 item.mood ? h(Tag, { color: "purple" }, item.mood) : null,
                 h(Popconfirm, { title: t("confirmDeleteSchedule"), onConfirm: function () { removeItem(idx); } },
-                  h(Button, { size: "small", type: "link", danger: true }, t("delete"))));
+                  h(Button, { size: "small", type: "link", danger: true, disabled: saving }, t("delete"))));
             })),
       h(Modal, {
         open: modalOpen, title: t("newSchedule"), okText: t("save"), cancelText: t("cancel"),
+        okButtonProps: { loading: saving },
         onCancel: function () { setModalOpen(false); setForm({ time: "", activity: "", mood: "" }); },
         onOk: addItem,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
@@ -339,39 +413,46 @@
 
   function DreamsTab(props) {
     var t = props.t, C = props.C;
-    var _d = useState(null), dreams = _d[0], setDreams = _d[1];
+    var s = useAsync(api.listDreams, []);
     var _v = useState(null), viewing = _v[0], setViewing = _v[1];
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ date: "", content: "" }), form = _f[0], setForm = _f[1];
+    var _g = useState(false), saving = _g[0], setSaving = _g[1];
+    var _p = useState(false), opening = _p[0], setOpening = _p[1];
 
-    function load() {
-      api.listDreams().then(setDreams).catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
-    }
-    useEffect(load, []);
+    if (s.loading) return h(LoadingBlock, { t: t, C: C });
+    if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
+    var dreams = s.data || [];
 
     function openDream(d) {
-      api.getDream(d).then(setViewing).catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
+      setOpening(true);
+      api.getDream(d).then(setViewing)
+        .catch(function (e) { message.error(t("loadFailed", { error: e.message })); })
+        .then(function () { setOpening(false); });
     }
 
     function submitDream() {
+      if (saving) return;
       if (!form.content.trim()) { message.warning(t("contentRequired")); return; }
       if (form.date && !isValidDate(form.date)) { message.warning(t("dateInvalid")); return; }
       var body = { content: form.content.trim() };
       if (form.date) body.date = form.date;
+      setSaving(true);
       api.createDream(body)
-        .then(function () { message.success(t("saved")); setModalOpen(false); setForm({ date: "", content: "" }); load(); })
-        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); });
+        .then(function () { message.success(t("saved")); setModalOpen(false); setForm({ date: "", content: "" }); s.retry(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setSaving(false); });
     }
 
     return h("div", {},
       h(Toolbar, {
         left: h(Space, {},
           h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); } }, t("newDream")),
-          h("span", { style: { color: C.sub, fontSize: 13 } }, t("tabDreams"))),
-        right: h(Button, { size: "small", onClick: load }, t("refresh")),
+          h("span", { style: { color: C.sub, fontSize: 13 } }, dreams.length ? t("tabDreams") + " · " + dreams.length : "")),
+        right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
       h("div", { style: panelStyle(C) },
-        !dreams || dreams.length === 0
+        dreams.length === 0
           ? h(Empty, { description: t("noDreams") })
           : dreams.map(function (dream, idx) {
               var preview = String(dream.content || "").replace(/^#.*$/m, "").trim().slice(0, 120);
@@ -385,11 +466,13 @@
                 h(Button, { size: "small", type: "link" }, t("view")));
             })),
       h(Modal, {
-        open: !!viewing, title: viewing ? t("dreamOf", { date: viewing.date }) : "",
+        open: !!viewing || opening, title: viewing ? t("dreamOf", { date: viewing.date }) : "",
         footer: null, onCancel: function () { setViewing(null); },
-      }, viewing ? h("div", { style: { whiteSpace: "pre-wrap", color: C.text, fontSize: 13, maxHeight: "60vh", overflow: "auto" } }, viewing.content) : null),
+      }, opening ? h("div", { style: { padding: 24, textAlign: "center" } }, h(Spin, {}))
+        : viewing ? h("div", { style: { whiteSpace: "pre-wrap", color: C.text, fontSize: 13, maxHeight: "60vh", overflow: "auto" } }, viewing.content) : null),
       h(Modal, {
         open: modalOpen, title: t("newDream"), okText: t("save"), cancelText: t("cancel"),
+        okButtonProps: { loading: saving },
         onCancel: function () { setModalOpen(false); setForm({ date: "", content: "" }); },
         onOk: submitDream,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
@@ -401,56 +484,63 @@
 
   function NotesTab(props) {
     var t = props.t, C = props.C;
-    var _n = useState(null), notes = _n[0], setNotes = _n[1];
     var _x = useState(false), showExpired = _x[0], setShowExpired = _x[1];
+    var s = useAsync(function () { return api.listNotes(showExpired); }, [showExpired]);
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ content: "", expires_at: "" }), form = _f[0], setForm = _f[1];
+    var _g = useState(false), busy = _g[0], setBusy = _g[1];
 
-    function load(expired) {
-      api.listNotes(expired !== undefined ? expired : showExpired)
-        .then(setNotes).catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
+    if (s.loading) return h(LoadingBlock, { t: t, C: C });
+    if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
+    var notes = s.data || [];
+
+    function runAsync(promise, onOk) {
+      if (busy) return;
+      setBusy(true);
+      promise
+        .then(function (res) { if (onOk) onOk(res); s.retry(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setBusy(false); });
     }
-    useEffect(function () { load(showExpired); }, [showExpired]);
 
     function toggleReminded(note) {
-      api.updateNote(note.id, { reminded: !note.reminded })
-        .then(function () { load(); })
-        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); });
+      runAsync(api.updateNote(note.id, { reminded: !note.reminded }));
     }
 
     function removeNote(id) {
-      api.deleteNote(id).then(function () { message.success(t("deleted")); load(); })
-        .catch(function (e) { message.error(t("deleteFailed", { error: e.message })); });
+      runAsync(api.deleteNote(id), function () { message.success(t("deleted")); });
     }
 
     function cleanExpired() {
-      api.cleanExpiredNotes()
-        .then(function (res) { message.success(t("cleaned", { count: (res && res.cleaned) || 0 })); load(); })
-        .catch(function (e) { message.error(t("deleteFailed", { error: e.message })); });
+      runAsync(api.cleanExpiredNotes(), function (res) {
+        message.success(t("cleaned", { count: (res && res.cleaned) || 0 }));
+      });
     }
 
     function submitCreate() {
       if (!form.content || !form.content.trim()) { message.warning(t("contentRequired")); return; }
       if (form.expires_at && !isValidDate(form.expires_at)) { message.warning(t("dateInvalid")); return; }
-      api.createNote({ content: form.content.trim(), expires_at: form.expires_at || "" })
-        .then(function () { message.success(t("saved")); setModalOpen(false); setForm({ content: "", expires_at: "" }); load(); })
-        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); });
+      runAsync(api.createNote({ content: form.content.trim(), expires_at: form.expires_at || "" }), function () {
+        message.success(t("saved"));
+        setModalOpen(false);
+        setForm({ content: "", expires_at: "" });
+      });
     }
 
-    var today = new Date().toISOString().slice(0, 10);
+    var today = localToday();
 
     return h("div", {},
       h(Toolbar, {
         left: h(Space, {},
-          h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); } }, t("newNote")),
+          h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); }, disabled: busy }, t("newNote")),
           h(Popconfirm, { title: t("cleanExpired"), onConfirm: cleanExpired },
-            h(Button, { size: "small" }, t("cleanExpired"))),
+            h(Button, { size: "small", disabled: busy }, t("cleanExpired"))),
           h("span", { style: { color: C.sub, fontSize: 12 } }, t("showExpired")),
           h(Switch, { size: "small", checked: showExpired, onChange: setShowExpired })),
-        right: h(Button, { size: "small", onClick: function () { load(); } }, t("refresh")),
+        right: h(Button, { size: "small", onClick: s.retry, disabled: busy }, t("refresh")),
       }),
       h("div", { style: panelStyle(C) },
-        !notes || notes.length === 0
+        notes.length === 0
           ? h(Empty, { description: t("tabNotes") })
           : notes.map(function (note, idx) {
               var expired = note.expires_at && note.expires_at < today;
@@ -461,10 +551,10 @@
                 h("div", { style: { display: "flex", alignItems: "flex-start", gap: 8 } },
                   h("span", { style: { flex: 1, color: C.text, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, note.content),
                   h(Space, { size: 4 },
-                    h(Button, { size: "small", type: "link", onClick: function () { toggleReminded(note); } },
+                    h(Button, { size: "small", type: "link", onClick: function () { toggleReminded(note); }, disabled: busy },
                       note.reminded ? t("notReminded") : t("reminded")),
                     h(Popconfirm, { title: t("confirmDeleteNote"), onConfirm: function () { removeNote(note.id); } },
-                      h(Button, { size: "small", type: "link", danger: true }, t("delete"))))),
+                      h(Button, { size: "small", type: "link", danger: true, disabled: busy }, t("delete"))))),
                 h("div", { style: { display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" } },
                   h(Tag, { color: note.reminded ? "green" : "default" }, note.reminded ? t("reminded") : t("notReminded")),
                   note.expires_at
@@ -474,6 +564,7 @@
             })),
       h(Modal, {
         open: modalOpen, title: t("newNote"), okText: t("save"), cancelText: t("cancel"),
+        okButtonProps: { loading: busy },
         onCancel: function () { setModalOpen(false); setForm({ content: "", expires_at: "" }); },
         onOk: submitCreate,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
@@ -487,31 +578,32 @@
 
   function RelationshipTab(props) {
     var t = props.t, C = props.C;
-    var _d = useState(null), data = _d[0], setData = _d[1];
+    var s = useAsync(api.getRelationship, []);
     var _e = useState(false), editing = _e[0], setEditing = _e[1];
     var _f = useState(""), editNotes = _f[0], setEditNotes = _f[1];
+    var _g = useState(false), saving = _g[0], setSaving = _g[1];
 
-    function load() {
-      api.getRelationship().then(setData).catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
-    }
-    useEffect(load, []);
-
-    if (!data) return h("div", { style: { padding: 32, textAlign: "center" } }, h(Empty, { description: "…" }));
+    if (s.loading) return h(LoadingBlock, { t: t, C: C });
+    if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
+    var data = s.data || {};
 
     var warmth = typeof data.warmth_score === "number" ? data.warmth_score : 0;
     var milestones = data.milestones || [];
 
     function saveNotes() {
+      if (saving) return;
+      setSaving(true);
       api.updateRelationship({ notes: editNotes })
-        .then(function () { message.success(t("saved")); setEditing(false); load(); })
-        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); });
+        .then(function () { message.success(t("saved")); setEditing(false); s.retry(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setSaving(false); });
     }
 
     return h("div", {},
       h(Toolbar, {
         left: h("span", { style: { color: C.sub, fontSize: 13 } },
           data.last_updated ? t("lastUpdated", { date: data.last_updated }) : ""),
-        right: h(Button, { size: "small", onClick: load }, t("refresh")),
+        right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 } },
         h("div", { style: panelStyle(C) },
@@ -521,8 +613,8 @@
             h("span", { style: { color: C.sub, fontSize: 13 } }, t("relNotes")),
             editing
               ? h(Space, { size: 4 },
-                  h(Button, { size: "small", type: "primary", onClick: saveNotes }, t("save")),
-                  h(Button, { size: "small", onClick: function () { setEditing(false); } }, t("cancel")))
+                  h(Button, { size: "small", type: "primary", onClick: saveNotes, loading: saving }, t("save")),
+                  h(Button, { size: "small", onClick: function () { setEditing(false); }, disabled: saving }, t("cancel")))
               : h(Button, { size: "small", type: "link", onClick: function () { setEditNotes(data.notes || ""); setEditing(true); } }, t("editRelNotes"))),
           editing
             ? h(TextArea, { rows: 3, value: editNotes, onChange: function (e) { setEditNotes(e.target.value); },
@@ -541,50 +633,77 @@
 
   // ── Tab: Important dates ─────────────────────────────────────────────
 
+  // 下一次周年还有几天：日期按 MM-DD 滚动，今年已过就取明年。
+  function daysUntilAnniversary(dateStr) {
+    var parts = String(dateStr || "").split("-");
+    if (parts.length !== 3) return null;
+    var m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
+    if (!m || !d) return null;
+    var now = new Date();
+    var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var next = new Date(today0.getFullYear(), m - 1, d);
+    if (next < today0) next = new Date(today0.getFullYear() + 1, m - 1, d);
+    return Math.round((next - today0) / 86400000);
+  }
+
   function DatesTab(props) {
     var t = props.t, C = props.C;
-    var _d = useState(null), dates = _d[0], setDates = _d[1];
+    var s = useAsync(api.getDates, []);
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ name: "", date: "", note: "" }), form = _f[0], setForm = _f[1];
+    var _g = useState(false), saving = _g[0], setSaving = _g[1];
 
-    function load() {
-      api.getDates().then(function (res) { setDates((res && res.dates) || []); })
-        .catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
-    }
-    useEffect(load, []);
+    if (s.loading) return h(LoadingBlock, { t: t, C: C });
+    if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
+
+    var dates = ((s.data && s.data.dates) || []).slice().sort(function (a, b) {
+      var da = daysUntilAnniversary(a.date), db = daysUntilAnniversary(b.date);
+      return (da === null ? 1e9 : da) - (db === null ? 1e9 : db);
+    });
 
     function removeDate(name) {
-      api.deleteDate(name).then(function () { message.success(t("deleted")); load(); })
-        .catch(function (e) { message.error(t("deleteFailed", { error: e.message })); });
+      if (saving) return;
+      setSaving(true);
+      api.deleteDate(name)
+        .then(function () { message.success(t("deleted")); s.retry(); })
+        .catch(function (e) { message.error(t("deleteFailed", { error: e.message })); })
+        .then(function () { setSaving(false); });
     }
 
     function submitAdd() {
+      if (saving) return;
       if (!form.name || !form.name.trim()) { message.warning(t("nameRequired")); return; }
       if (!form.date) { message.warning(t("dateRequired")); return; }
       if (!isValidDate(form.date)) { message.warning(t("dateInvalid")); return; }
+      setSaving(true);
       api.addDate({ name: form.name.trim(), date: form.date, note: form.note || "" })
-        .then(function () { message.success(t("saved")); setModalOpen(false); setForm({ name: "", date: "", note: "" }); load(); })
-        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); });
+        .then(function () { message.success(t("saved")); setModalOpen(false); setForm({ name: "", date: "", note: "" }); s.retry(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setSaving(false); });
     }
 
     return h("div", {},
       h(Toolbar, {
         left: h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); } }, t("addDate")),
-        right: h(Button, { size: "small", onClick: load }, t("refresh")),
+        right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
       h("div", { style: panelStyle(C) },
-        !dates || dates.length === 0
+        dates.length === 0
           ? h(Empty, { description: t("noDates") })
           : dates.map(function (item, idx) {
+              var left = daysUntilAnniversary(item.date);
+              var label = left === null ? "" : left === 0 ? t("isToday") : left === 1 ? t("tomorrow") : t("inDays", { count: left });
               return h("div", { key: item.name || idx, style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: idx < dates.length - 1 ? C.fieldBorder : "none" } },
-                h(Tag, { color: "magenta", style: { flexShrink: 0, fontFamily: "monospace" } }, item.date || ""),
+                h(Tag, { color: item.date === localToday() ? "red" : "magenta", style: { flexShrink: 0, fontFamily: "monospace" } }, item.date || ""),
                 h("span", { style: { color: C.text, fontSize: 13, fontWeight: 500 } }, item.name || ""),
                 h("span", { style: { flex: 1, color: C.muted, fontSize: 12 } }, item.note || ""),
+                label ? h(Tag, { color: left === 0 ? "red" : "gold" }, label) : null,
                 h(Popconfirm, { title: t("confirmDeleteDate", { name: item.name }), onConfirm: function () { removeDate(item.name); } },
-                  h(Button, { size: "small", type: "link", danger: true }, t("delete"))));
+                  h(Button, { size: "small", type: "link", danger: true, disabled: saving }, t("delete"))));
             })),
       h(Modal, {
         open: modalOpen, title: t("addDate"), okText: t("save"), cancelText: t("cancel"),
+        okButtonProps: { loading: saving },
         onCancel: function () { setModalOpen(false); setForm({ name: "", date: "", note: "" }); },
         onOk: submitAdd,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
@@ -597,31 +716,34 @@
 
   function DataTab(props) {
     var t = props.t, C = props.C;
-    var _h = useState(null), healthData = _h[0], setHealthData = _h[1];
+    var s = useAsync(api.health, []);
+    var _b = useState(false), exporting = _b[0], setExporting = _b[1];
+    var _i = useState(false), importing = _i[0], setImporting = _i[1];
     var fileRef = React.useRef(null);
-
-    useEffect(function () {
-      api.health().then(setHealthData).catch(function () {});
-    }, []);
+    var healthData = s.data;
 
     function doExport() {
+      if (exporting) return;
+      setExporting(true);
       api.exportAll()
         .then(function (data) {
           var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           var url = URL.createObjectURL(blob);
           var a = document.createElement("a");
           a.href = url;
-          a.download = "companion-core-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+          a.download = "companion-core-backup-" + localToday() + ".json";
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
           message.success(t("exportSuccess"));
         })
-        .catch(function (e) { message.error(t("loadFailed", { error: e.message })); });
+        .catch(function (e) { message.error(t("loadFailed", { error: e.message })); })
+        .then(function () { setExporting(false); });
     }
 
     function doImport(file) {
+      setImporting(true);
       var reader = new FileReader();
       reader.onload = function (ev) {
         try {
@@ -630,12 +752,18 @@
             .then(function (res) {
               var fields = (res && res.imported) ? res.imported.join(", ") : "";
               message.success(t("importSuccess", { fields: fields }));
-              api.health().then(setHealthData).catch(function () {});
+              s.retry();
             })
-            .catch(function (e) { message.error(t("importFailed", { error: e.message })); });
+            .catch(function (e) { message.error(t("importFailed", { error: e.message })); })
+            .then(function () { setImporting(false); });
         } catch (err) {
           message.error(t("importFailed", { error: err.message }));
+          setImporting(false);
         }
+      };
+      reader.onerror = function () {
+        message.error(t("importFailed", { error: "read error" }));
+        setImporting(false);
       };
       reader.readAsText(file);
     }
@@ -648,31 +776,44 @@
       }
     }
 
+    var busy = exporting || importing;
+
+    // 这里不整页拦截：后端不通时导出/导入按钮仍需可用，只把故障显式标出来。
+    var banner = healthData
+      ? h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 } },
+          h(Tag, { color: "green" }, t("healthStatus") + ": " + (healthData.status || "ok")),
+          h(Tag, {}, t("healthDreams") + ": " + (healthData.dreams_count || 0)),
+          h(Tag, {}, t("healthNotes") + ": " + (healthData.notes_count || 0)),
+          h("span", { style: { color: C.muted, fontSize: 12, lineHeight: "22px" } }, healthData.data_dir || "")
+        )
+      : s.error
+        ? h("div", { style: { display: "flex", gap: 10, alignItems: "center", marginBottom: 16 } },
+            h(Tag, { color: "red" }, t("loadError") + ": " + (s.error.message || String(s.error))),
+            h(Button, { size: "small", onClick: s.retry }, t("retry")))
+        : null;
+
     return h("div", {},
       h("div", { style: panelStyle(C) },
         h("div", { style: { fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 12 } }, t("tabData")),
-        healthData ? h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 } },
-          h(Tag, { color: "green" }, "状态: " + (healthData.status || "ok")),
-          h(Tag, {}, "梦境: " + (healthData.dreams_count || 0)),
-          h(Tag, {}, "便签: " + (healthData.notes_count || 0)),
-          h("span", { style: { color: C.muted, fontSize: 12 } }, healthData.data_dir || "")
-        ) : null,
+        banner,
         h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 } },
           h("div", { style: { padding: 16, borderRadius: 8, border: C.border } },
             h("div", { style: { fontWeight: 500, color: C.text, marginBottom: 6 } }, t("exportData")),
             h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 12 } }, t("exportDesc")),
-            h(Button, { type: "primary", onClick: doExport }, t("exportData"))),
+            h(Button, { type: "primary", onClick: doExport, loading: exporting, disabled: busy }, t("exportData"))),
           h("div", { style: { padding: 16, borderRadius: 8, border: C.border } },
             h("div", { style: { fontWeight: 500, color: C.text, marginBottom: 6 } }, t("importData")),
             h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 12 } }, t("importDesc")),
             h("input", { ref: fileRef, type: "file", accept: ".json", style: { display: "none" }, onChange: onFileChange }),
             h(Popconfirm, {
-              title: "导入将覆盖现有数据，确定继续？",
+              title: t("importConfirm"),
               onConfirm: function () { if (fileRef.current) fileRef.current.click(); },
-            }, h(Button, { danger: true }, t("importData")))))));
+            }, h(Button, { danger: true, loading: importing, disabled: busy }, t("importData")))))));
   }
 
   // ── Root ─────────────────────────────────────────────────────────────
+
+  var APP_VERSION = "2.3.1";
 
   function CompanionApp() {
     var locale = normalizeLocale(useHostLocale());
@@ -686,7 +827,9 @@
       h("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 8 } },
         h("span", { style: { fontSize: 26 } }, "💞"),
         h("div", {},
-          h("div", { style: { fontSize: 18, fontWeight: 600 } }, t("appTitle")),
+          h("div", { style: { fontSize: 18, fontWeight: 600 } },
+            t("appTitle"),
+            h("span", { style: { fontSize: 11, fontWeight: 400, color: C.muted, marginLeft: 8 } }, "v" + APP_VERSION)),
           h("div", { style: { fontSize: 12, color: C.muted } }, t("appSubtitle")))),
       h(Tabs, {
         defaultActiveKey: "state",
@@ -707,9 +850,9 @@
   QwenPaw.registerRoutes("companion-core", [{
     path: "/apps/companion-core",
     component: CompanionApp,
-    label: "Companion Core",
+    label: "陪伴核心",
     icon: "💞",
   }]);
 
-  console.info("[companion-core] v2.3.1 registered route /apps/companion-core");
+  console.info("[companion-core] v" + APP_VERSION + " registered route /apps/companion-core");
 })();

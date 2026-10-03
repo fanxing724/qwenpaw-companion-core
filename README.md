@@ -24,7 +24,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
-- v2.3.1：修复前端 API 路径在不同宿主下 404（启动时探测 `host.getApiUrl` 的 `/api` 前缀语义并自适应）
+- v2.3.1：修复前端 API 路径在不同宿主下 404（启动时探测 `host.getApiUrl` 的 `/api` 前缀语义并自适应）；补齐加载/错误状态与防重复提交；日程按时间排序、重要日期显示倒计时；日期判定改用本地时区
 - v2.3.0：新增 4 个 Agent 工具（共 7 个）、动态系统提示、暗色模式、数据导出/导入 UI、日程编辑与梦境创建
 - v2.2.0：后端入口迁移至 `plugin.py`，数据目录统一为 `~/.qwenpaw/data/companion-core/`，新增 Agent 工具注册与系统提示注入
 - 从 1.x 升级：本版本由旧版 `general` 插件迁移为 `app` 类型 PawApp，API 前缀由 `/api/companion` 变更为 `/api/companion-core`。如需保留旧数据，将原工作区 `companion_data/` 中的文件复制到 `~/.qwenpaw/data/companion-core/` 即可。
