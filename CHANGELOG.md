@@ -5,6 +5,12 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.3.1] - 2026-10-03
+
+### 修复
+- 前端所有 API 调用在不同 QwenPaw 宿主下可能 404：`host.getApiUrl()` 是否自动补 `/api` 前缀存在版本差异，现改为启动时用一次探针探测宿主语义，并据此决定请求路径是否自带 `/api`，两种宿主均可正确解析到 `/api/companion-core/*`
+- `plugin.py` 模块文档字符串的工具清单由 4 个补全为 7 个
+
 ## [2.3.0] - 2026-10-03
 
 ### 新增

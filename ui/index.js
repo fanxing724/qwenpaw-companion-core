@@ -1,8 +1,8 @@
 /**
- * Companion Core v2.3.0 — frontend dashboard.
+ * Companion Core v2.3.1 — frontend dashboard.
  *
  * 7 tabs: State, Schedule, Dreams, Notes, Relationship, Dates, Data.
- * Supports dark mode via host.useTheme() and uses host.fetch for API calls.
+ * Dark mode via host.useTheme(); API calls go through host.getApiUrl().
  */
 (function () {
   var QwenPaw = window.QwenPaw;
@@ -141,9 +141,20 @@
 
   // ── API helpers ──────────────────────────────────────────────────────
 
+  // 宿主 getApiUrl 是否自动补 /api 前缀在不同 QwenPaw 版本里行为不一致：
+  // 传一个探针路径看返回值，据此决定要不要自己带 /api，避免整站 404。
+  var API_PREFIX = (function () {
+    try {
+      var probe = String(host.getApiUrl("/__cp_probe__") || "");
+      return /\/api\/__cp_probe__$/.test(probe) ? "" : "/api";
+    } catch (e) {
+      return "/api";
+    }
+  })();
+
   function apiFetch(path, opts) {
     opts = opts || {};
-    var url = host.getApiUrl(path);
+    var url = host.getApiUrl(API_PREFIX + path);
     var token = host.getApiToken ? host.getApiToken() : "";
     var headers = opts.headers || {};
     headers["Content-Type"] = "application/json";
@@ -700,5 +711,5 @@
     icon: "💞",
   }]);
 
-  console.info("[companion-core] v2.3.0 registered route /apps/companion-core");
+  console.info("[companion-core] v2.3.1 registered route /apps/companion-core");
 })();

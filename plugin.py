@@ -25,10 +25,13 @@
   - GET      /health             健康检查
 
 智能体工具（@app.tool，tool_type=internal）：
-  - companion_get_state      读取当前状态
-  - companion_get_schedule   读取今日日程
-  - companion_get_notes      读取便签列表
-  - companion_get_relationship 读取关系记录
+  - companion_get_state          读取当前状态
+  - companion_get_schedule       读取今日日程
+  - companion_get_notes          读取便签列表
+  - companion_get_relationship   读取关系记录
+  - companion_get_important_dates 读取重要日期
+  - companion_update_state       更新状态字段
+  - companion_create_note        创建便签
 """
 
 import asyncio
@@ -50,7 +53,7 @@ from qwenpaw.pawapp import PawApp
 
 logger = logging.getLogger(__name__)
 
-PLUGIN_VERSION = "2.3.0"
+PLUGIN_VERSION = "2.3.1"
 PLUGIN_NAME = "陪伴核心"
 PLUGIN_ID = "companion-core"
 

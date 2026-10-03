@@ -14,3 +14,7 @@ node_modules/
 *.log
 .idea/
 .vscode/
+
+# 本地模拟运行脚本（依赖 mock 宿主，不随插件分发）
+test_simulate.py
+.pytest_cache/
