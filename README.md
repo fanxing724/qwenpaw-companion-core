@@ -1,6 +1,10 @@
-# 💞 Companion Core — 陪伴核心系统
+# 💞 陪伴核心系统（Companion Core）
 
 基于 PawApp 框架（QwenPaw 2.x）开发的一体化陪伴系统，为 QwenPaw Agent 提供状态管理、梦境记录、日程安排、便签提醒、关系记录和重要日期管理，并附带可视化仪表盘。
+
+## 🙏 致谢
+
+本项目灵感与功能设计来源于 [astrbot_plugin_private_companion](https://github.com/menglimi/astrbot_plugin_private_companion)，针对 QwenPaw 平台进行了适配与重构。感谢原作者的贡献。
 
 ## ✨ 特性
 
