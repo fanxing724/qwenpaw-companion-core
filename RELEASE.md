@@ -20,7 +20,7 @@ qwenpaw plugin install /path/to/companion-core-2.4.0.zip
 
 覆盖安装请添加 `--force`。用户数据目录仍为 `~/.qwenpaw/data/companion-core/`。
 
-安装包内含 `plugin.json`、完整 `README.md`、`RELEASE.md`、`CHANGELOG.md`、MIT `LICENSE`、后端、前端及种子模板。Release 也单独提供 README 和 LICENSE 下载。
+安装包内含 `plugin.json`、完整 `README.md`、`RELEASE.md`、`CHANGELOG.md`、MIT `LICENSE`、后端、前端及种子模板。Release 附件仅提供插件 ZIP。
 
 ## 许可与验证
 

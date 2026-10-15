@@ -217,5 +217,5 @@ python3 scripts/package.py
 
 - 推送 `main` 或手动运行 **Package and Release**：验证后生成 ZIP，可在对应 Actions 运行的 Artifacts 中下载。
 - 推送 `v<版本号>` 标签：核对标签与 `plugin.json` 版本，验证并打包，自动发布 GitHub Release。
-- Release 页面展示 `RELEASE.md`，并提供安装包、`README.md` 和 `LICENSE` 下载。
+- Release 页面展示 `RELEASE.md`，附件仅提供插件 ZIP；README 和 LICENSE 保留在仓库及 ZIP 内。
 - 安装 ZIP 顶层为 `companion-core/`，其中包含描述清单、README、发布说明、更新日志和 MIT 协议；缺少必要文件会直接阻止打包。

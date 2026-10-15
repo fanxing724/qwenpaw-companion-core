@@ -9,7 +9,7 @@
 
 ### 打包与发布
 - main 推送和手动触发自动验证并打包；版本标签触发正式 Release。
-- 新增 RELEASE.md 发布说明，Release 单独提供 README 和 LICENSE。
+- 新增 RELEASE.md 发布说明；Release 附件仅提供插件 ZIP，文档与协议保留在仓库及 ZIP 内。
 - 打包前检查描述清单、文档、协议和入口文件，避免缺失文件的安装包被发布。
 
 ### 界面与交互
