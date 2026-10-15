@@ -450,9 +450,7 @@ class ChatOrganizer:
                     path = c['_DATA_DIR']/'dreams'/f"{dream['date']}.md"
                     if path.exists() and path.read_text(encoding='utf-8').strip() == dream['content']:
                         continue
-                    temp = path.with_suffix('.md.tmp')
-                    temp.write_text(dream['content'], encoding='utf-8')
-                    os.replace(temp, path)
+                    c['_write_text'](path, dream['content'])
 
     async def manual(self, request, payload):
         workspace = await self.workspace(request, payload.agent_id)

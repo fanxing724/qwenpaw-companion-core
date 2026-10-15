@@ -484,3 +484,54 @@ def test_setup_preserves_existing_and_custom_seed_data(loaded):
     after=module.export_all_data();after.pop('exported_at')
     assert after==before
     assert client.post(prefix+'/setup',json={'user_name':'x'*81}).status_code==422
+
+
+@pytest.mark.parametrize('value,status', [
+    ('2026-13-40', 400), ('2026-02-29', 400), ('2024-02-29', 404),
+    ('2026-1-01', 400), ('2026-10-15', 404),
+])
+def test_dream_calendar_validation(loaded, value, status):
+    module, client, data, sdk = loaded
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
+    assert client.get(prefix + '/dreams/' + value).status_code == status
+
+
+def test_timezone_boundary_and_health(loaded, monkeypatch):
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    module, client, data, sdk = loaded
+    instant = datetime(2026, 10, 15, 16, 30, tzinfo=timezone.utc)
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is not None
+            return instant.astimezone(tz)
+    monkeypatch.setattr(module, 'datetime', Clock)
+    monkeypatch.setattr(module, '_TIMEZONE', ZoneInfo('Asia/Shanghai'))
+    monkeypatch.setattr(module, '_TIMEZONE_NAME', 'Asia/Shanghai')
+    assert module._today_str() == '2026-10-16'
+    assert module._now_ts() == '2026-10-16T00:30:00+08:00'
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
+    health = client.get(prefix + '/health').json()
+    assert health['timezone'] == 'Asia/Shanghai'
+    assert health['today'] == '2026-10-16'
+    monkeypatch.setattr(module, '_TIMEZONE', ZoneInfo('UTC'))
+    assert module._today_str() == '2026-10-15'
+    assert module._now_ts().endswith('+00:00')
+
+
+def test_private_record_permissions_and_preserved_contents(loaded):
+    module, client, data, sdk = loaded
+    module._seed_data()
+    paths = [data / 'state.yaml', data / 'notes.json', data / 'dreams' / '2026-10-15.md']
+    module._write_yaml(paths[0], {'mood':'保留我的状态'})
+    module._write_json(paths[1], [])
+    module._write_text(paths[2], '保留我的梦境')
+    before = {path: path.read_bytes() for path in paths}
+    for path in paths:
+        assert path.stat().st_mode & 0o777 == 0o600
+        path.chmod(0o644)
+    module._seed_data()
+    for path in paths:
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert path.read_bytes() == before[path]

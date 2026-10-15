@@ -39,12 +39,12 @@ import json
 import logging
 import os
 import re
-import shutil
 import threading
 from functools import wraps
 from uuid import uuid4
 from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 from fastapi import APIRouter, HTTPException, Request
@@ -65,6 +65,10 @@ PLUGIN_ID = "companion-core"
 TOOL_NAMES = tuple(item["name"] for item in json.loads(
     (Path(__file__).resolve().parent / "plugin.json").read_text(encoding="utf-8")
 )["meta"]["tools"])
+# Business dates are independent of the host/container timezone.
+_TIMEZONE_NAME = os.environ.get("QWENPAW_COMPANION_TIMEZONE", "Asia/Shanghai")
+_TIMEZONE = ZoneInfo(_TIMEZONE_NAME)
+
 _binding_lock = threading.Lock()
 _call_history = {}  # Bounded latest call per agent; no conversation content stored.
 
@@ -194,12 +198,21 @@ def _read_yaml(path: Path) -> dict:
         return {}
 
 
-def _write_yaml(path: Path, data: dict) -> None:
+def _write_text(path: Path, content: str) -> None:
+    """Atomically replace a private data file without a world-readable temp file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".yaml.tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
-    os.replace(tmp, path)
+    tmp = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            file.write(content)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _write_yaml(path: Path, data: dict) -> None:
+    _write_text(path, yaml.safe_dump(data, allow_unicode=True, default_flow_style=False))
 
 
 def _read_json(path: Path) -> list | dict:
@@ -215,11 +228,7 @@ def _read_json(path: Path) -> list | dict:
 
 
 def _write_json(path: Path, data: list | dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".json.tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
+    _write_text(path, json.dumps(data, ensure_ascii=False, indent=2))
 
 
 def _read_notes() -> list:
@@ -228,11 +237,15 @@ def _read_notes() -> list:
 
 
 def _today_str() -> str:
-    return date.today().isoformat()
+    return _now().date().isoformat()
+
+
+def _now() -> datetime:
+    return datetime.now(_TIMEZONE)
 
 
 def _now_ts() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    return _now().isoformat(timespec="seconds")
 
 
 def _is_expired(note: dict, today: str) -> bool:
@@ -262,7 +275,7 @@ def _seed_data() -> None:
         if not path.exists():
             pkg_file = pkg_data_dir / name
             if pkg_file.exists():
-                shutil.copy2(pkg_file, path)
+                _write_text(path, pkg_file.read_text(encoding="utf-8"))
             else:
                 _write_yaml(path, default_payload)
 
@@ -270,9 +283,16 @@ def _seed_data() -> None:
     if not notes_path.exists():
         pkg_notes = pkg_data_dir / "notes.json"
         if pkg_notes.exists():
-            shutil.copy2(pkg_notes, notes_path)
+            _write_text(notes_path, pkg_notes.read_text(encoding="utf-8"))
         else:
             _write_json(notes_path, [])
+
+    # Only known plugin records: preserve contents and leave unrelated files alone.
+    for path in [*(_DATA_DIR / "dreams").glob("*.md"),
+                 *(_DATA_DIR / "organizer-backups").glob("*.json"),
+                 *[_DATA_DIR / name for name in (*yaml_seeds, "notes.json", "setup.json", "organizer-settings.json", "organizer-status.json")]]:
+        if path.is_file():
+            path.chmod(0o600)
 
 
 # ── HTTP router ──────────────────────────────────────────────────────
@@ -350,8 +370,10 @@ def list_dreams():
 @router.get("/dreams/{dream_date}", response_model=DreamModel)
 def get_dream(dream_date: str):
     """获取指定日期的梦境。"""
-    if not _DATE_RE.match(dream_date):
-        raise HTTPException(400, "日期格式须为 YYYY-MM-DD")
+    try:
+        _validate_date(dream_date)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
     path = _DATA_DIR / "dreams" / f"{dream_date}.md"
     if not path.exists():
         raise HTTPException(404, f"没有 {dream_date} 的梦境记录")
@@ -377,7 +399,7 @@ def create_dream(dream: DreamModel):
             new_content = f"{existing}\n\n---\n\n{dream.content.strip()}"
         else:
             new_content = f"# {dream_date} 的梦\n\n{dream.content.strip()}"
-        path.write_text(new_content, encoding="utf-8")
+        _write_text(path, new_content)
 
         state_path = _DATA_DIR / "state.yaml"
         state = _read_yaml(state_path)
@@ -613,7 +635,7 @@ def import_all_data(data: dict):
                     dream_date = str(dream["date"])
                     if _DATE_RE.match(dream_date):
                         path = dreams_dir / f"{dream_date}.md"
-                        path.write_text(str(dream["content"]), encoding="utf-8")
+                        _write_text(path, str(dream["content"]))
                         count += 1
             imported.append(f"dreams({count})")
         if "notes" in data and isinstance(data["notes"], list):
@@ -650,7 +672,7 @@ def apply_relationship_decay():
 
         try:
             last_date = datetime.strptime(last_updated[:10], "%Y-%m-%d").date()
-            today = date.today()
+            today = _now().date()
             days_since = (today - last_date).days
         except Exception:
             return {"decayed": 0, "warmth_score": data.get("warmth_score")}
@@ -682,6 +704,8 @@ def health():
         "tool_names": list(TOOL_NAMES) if app is not None else [],
         "tool_count": len(TOOL_NAMES) if app is not None else 0,
         "data_dir": str(_DATA_DIR),
+        "timezone": _TIMEZONE_NAME,
+        "today": _today_str(),
         "dreams_count": len(list(dreams_dir.glob("*.md")))
         if dreams_dir.exists()
         else 0,
@@ -791,7 +815,7 @@ def _record_tool_call(tool_name, status):
         if len(_call_history) >= 256 and agent_id not in _call_history:
             _call_history.pop(next(iter(_call_history)))
         _call_history[agent_id] = {"tool": tool_name, "status": status,
-                                   "at": datetime.now().astimezone().isoformat(timespec="seconds")}
+                                   "at": _now_ts()}
 
 
 # ── PawApp definition + lifecycle ────────────────────────────────────
@@ -1005,7 +1029,7 @@ async def companion_get_important_dates():
     dates = data["dates"]
     if not dates:
         return _text_response("还没有记录重要日期。")
-    today = date.today()
+    today = _now().date()
     lines = ["重要日期："]
     for d in dates:
         name = d.get("name", "")
@@ -1064,7 +1088,7 @@ def _build_prompt(agent) -> str:
     try:
         dates_data = _read_yaml(_DATA_DIR / "important_dates.yaml")
         dates_list = dates_data.get("dates", []) if dates_data else []
-        today_d = date.today()
+        today_d = _now().date()
         for d in dates_list:
             dt_str = d.get("date", "")
             try:

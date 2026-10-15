@@ -45,10 +45,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.7.1.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.7.2.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.7.1.zip
+qwenpaw plugin install /path/to/companion-core-2.7.2.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -173,6 +173,12 @@ companion-core/
 ```
 
 首次加载会自动补全缺失的种子文件，不覆盖已有文件。可通过 `/api/companion-core/export` 导出备份，`/api/companion-core/import` 恢复。
+
+### 业务时区与数据权限
+
+插件默认按 `Asia/Shanghai` 计算“今日”，不依赖容器是否采用 UTC，也不修改宿主时区。需要其他时区时，为插件进程设置 `QWENPAW_COMPANION_TIMEZONE` 为 IANA 时区名（例如 `UTC`、`America/New_York`），重新加载后生效。无效时区会阻止加载，请修正配置。`/health` 的 `timezone` 与 `today` 可用于核对；调用记录与新记录时间戳携带时区偏移。已有日期和时间戳不重写，历史无时区时间戳不自动转换。
+
+升级会在初始化时将已知陪伴记录、梦境与整理备份文件收紧为 `0600`，保留内容；新增与替换记录也使用 `0600` 的临时文件原子写入。不会改变宿主时区、用户数据内容或启动备份服务。
 
 ### 已安装实例与容器迁移
 

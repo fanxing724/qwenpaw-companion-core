@@ -1,7 +1,7 @@
 {
   "id": "companion-core",
   "name": "陪伴核心",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "description": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期，支持搜索编辑、备份恢复和 REST API。",
   "description_i18n": {
     "zh-CN": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期，支持搜索编辑、备份恢复和 REST API。",
