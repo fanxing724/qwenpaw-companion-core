@@ -44,6 +44,11 @@
 
   var MESSAGES = {
     zh: {
+      tabAgents: "智能体绑定", agentsHint: "绑定会在宿主配置中启用该智能体的 7 个陪伴工具。数据仍由本插件共享；绑定不代表模型已经调用。",
+      agentBind: "绑定并启用工具", agentUnbind: "解除绑定", agentBound: "已绑定", agentPartial: "部分启用", agentUnbound: "未绑定", agentUnknown: "配置读取失败",
+      agentDisabled: "智能体已停用", agentNoCalls: "尚未观察到调用（仅记录本次插件运行期间）", agentLastCall: "最近实际调用", agentSuccess: "成功", agentError: "失败",
+      agentTest: "绑定后，在该智能体的新对话里发送：请调用 companion_get_state 和 companion_get_notes，告诉我当前心情及便签。随后点击刷新，查看是否出现实际调用记录。",
+      agentEmpty: "宿主中没有可绑定的智能体。", agentRefresh: "刷新状态", agentTools: "工具启用数", agentSaved: "配置已保存", agentNoSdk: "当前宿主不支持智能体绑定。",
       tabOverview: "今日总览", overviewHint: "把今天的状态、安排和牵挂放在一起。",
       pendingNotes: "待提醒便签", upcoming: "即将到来", nextPlan: "今天的安排",
       quickActions: "快速前往", welcome: "每一天，都值得好好记录", todayLabel: "今日陪伴",
@@ -94,6 +99,11 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
+      tabAgents: "Agent binding", agentsHint: "Binding enables the seven companion tools in the host agent configuration. Companion data remains shared; binding does not prove model usage.",
+      agentBind: "Bind and enable tools", agentUnbind: "Unbind", agentBound: "Bound", agentPartial: "Partially enabled", agentUnbound: "Unbound", agentUnknown: "Cannot read configuration",
+      agentDisabled: "Agent disabled", agentNoCalls: "No observed calls in this plugin run", agentLastCall: "Last actual call", agentSuccess: "Success", agentError: "Failed",
+      agentTest: "After binding, start a new conversation with that agent: Please call companion_get_state and companion_get_notes and report my mood and notes. Then refresh here to check for an actual tool call.",
+      agentEmpty: "No agents configured in the host.", agentRefresh: "Refresh status", agentTools: "Enabled tools", agentSaved: "Configuration saved", agentNoSdk: "This host does not support agent binding.",
       tabOverview: "Overview", overviewHint: "Your mood, plans and reminders, together.",
       pendingNotes: "Pending reminders", upcoming: "Coming up", nextPlan: "Today's plans",
       quickActions: "Quick access", welcome: "A little care, every day", todayLabel: "DAILY COMPANION",
@@ -309,6 +319,8 @@
     deleteDate: function (n) { return apiFetch("/companion-core/dates/" + encodeURIComponent(n), { method: "DELETE" }); },
     exportAll: function () { return apiFetch("/companion-core/export"); },
     importAll: function (d) { return apiFetch("/companion-core/import", { method: "POST", body: d }); },
+    agents: function () { return apiFetch("/companion-core/agents"); },
+    bindAgent: function (id, enabled) { return apiFetch("/companion-core/agents/" + encodeURIComponent(id) + "/binding", {method:"PUT", body:{enabled:enabled}}); },
     health: function () { return apiFetch("/companion-core/health"); },
   };
 
@@ -858,6 +870,45 @@
 
   // ── Tab: Data (export / import) ──────────────────────────────────────
 
+  function AgentsTab(props) {
+    var t = props.t, C = props.C;
+    var s = useAsync(api.agents, []);
+    var busyState = useState(false), busy = busyState[0], setBusy = busyState[1];
+    var noticeState = useState(""), notice = noticeState[0], setNotice = noticeState[1];
+    function bind(id, enabled) {
+      if (busy) return;
+      setBusy(true);
+      api.bindAgent(id, enabled).then(function (result) {
+        setNotice(result.message || t("agentSaved"));
+        s.retry();
+      }).catch(function (error) { message.error(error.message); })
+        .then(function () { setBusy(false); });
+    }
+    var data = s.data;
+    return h("section", {style:panelStyle(C)},
+      h(Toolbar, {left:h("strong",null,t("tabAgents")),right:h(Button,{onClick:s.retry,disabled:busy},t("agentRefresh"))}),
+      h(SectionIntro,{C:C},t("agentsHint")),
+      notice ? h("p",{role:"status",style:{color:C.sub}},notice) : null,
+      s.loading ? h(LoadingBlock,{t:t,C:C}) : s.error ? h(ErrorBlock,{t:t,C:C,error:s.error,onRetry:s.retry}) : null,
+      data && !data.supported ? h("p",{role:"status"},data.reason || t("agentNoSdk")) : null,
+      data && data.supported && !data.agents.length ? h("p",null,t("agentEmpty")) : null,
+      data && data.supported ? data.agents.map(function (agent) {
+        var labels = {bound:"agentBound", partial:"agentPartial", unbound:"agentUnbound", unknown:"agentUnknown"};
+        return h("article",{key:agent.id,style:{border:C.border,borderRadius:12,padding:16,marginBottom:14}},
+          h("h3",{style:{marginTop:0}},agent.name," ",h(Tag,{color:agent.binding === "bound" ? "green" : "default"},t(labels[agent.binding] || "agentUnknown"))),
+          h("p",{style:{color:C.sub,overflowWrap:"anywhere"}},agent.id),
+          agent.error ? h("p",{role:"alert"},agent.error) : h("p",null,t("agentTools") + ": " + agent.enabled_tools.length + "/" + agent.total_tools),
+          agent.agent_enabled === false ? h("p",null,t("agentDisabled")) : null,
+          h("p",{style:{overflowWrap:"anywhere"}},agent.last_call
+            ? t("agentLastCall") + ": " + agent.last_call.tool + " · " + t(agent.last_call.status === "success" ? "agentSuccess" : "agentError") + " · " + agent.last_call.at
+            : t("agentNoCalls")),
+          h("div",{style:{display:"flex",flexWrap:"wrap",gap:8}},
+            h(Button,{type:"primary",disabled:busy || !!agent.error || agent.agent_enabled === false || agent.binding === "bound",onClick:function(){bind(agent.id,true);}},t("agentBind")),
+            h(Button,{disabled:busy || !!agent.error || agent.binding === "unbound",onClick:function(){bind(agent.id,false);}},t("agentUnbind"))));
+      }) : null,
+      h("p",{style:{color:C.sub,lineHeight:1.8}},t("agentTest")));
+  }
+
   function DataTab(props) {
     var t = props.t, C = props.C;
     var s = useAsync(api.health, []);
@@ -1008,6 +1059,7 @@
           { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { key:revision, t: t, C: C }) },
           { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { key:revision, t: t, C: C }) },
           { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C }) },
+          { key: "agents", label: "🤖 " + t("tabAgents"), children: h(AgentsTab, { t:t, C:C }) },
           { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
         ],
       }));

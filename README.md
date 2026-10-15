@@ -33,7 +33,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
-- v2.4.1：新增今日总览、响应式卡片界面、日程/便签编辑及搜索筛选；加强日期时间校验、导入预校验，避免便签 ID 冲突。保留 2.3.2 的标准插件适配。
+- v2.5.0：新增今日总览、响应式卡片界面、日程/便签编辑及搜索筛选；加强日期时间校验、导入预校验，避免便签 ID 冲突。保留 2.3.2 的标准插件适配。
 - v2.3.0：新增 4 个 Agent 工具（共 7 个）、动态系统提示、暗色模式、数据导出/导入 UI、日程编辑与梦境创建
 - v2.2.0：后端入口迁移至 `plugin.py`，数据目录统一为 `~/.qwenpaw/data/companion-core/`，新增 Agent 工具注册与系统提示注入
 - 从 1.x 升级：本版本由旧版 `general` 插件迁移为 `app` 类型 PawApp，API 前缀由 `/api/companion` 变更为 `/api/companion-core`。如需保留旧数据，将原工作区 `companion_data/` 中的文件复制到 `~/.qwenpaw/data/companion-core/` 即可。
@@ -42,10 +42,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.4.1.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.5.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.4.1.zip
+qwenpaw plugin install /path/to/companion-core-2.5.0.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -97,6 +97,21 @@ PawApp SDK 模式遵循官方 Creator 的路由约定，使用 `/api/companion-c
 | `companion_create_note` | 创建便签 |
 
 SDK 模式同时通过 `app.prompt_section` 注入系统提示。标准 `router` 模式提供全部仪表盘和 REST API，但不注册这些工具或注入提示；Agent 可使用下方 SKILL.md 模板通过 REST API 访问。`/health` 返回 `agent_tools` 字段标识当前模式。
+
+## 🤝 绑定智能体与验证 AI 调用
+
+打开仪表盘的 **智能体绑定** 页，选择目标智能体并点击 **绑定并启用工具**。该操作通过 QwenPaw 官方配置接口启用上述 7 个工具，只修改所选智能体的陪伴工具，保留其他工具的配置。新建的智能体也可在这里绑定。解除绑定会关闭该智能体的这 7 个工具。
+
+- 页面读取宿主真实配置，显示未绑定、部分启用、已绑定或配置读取失败。
+- 保存后请求宿主重新加载智能体；无法请求时，页面提示手动重新加载或重启 QwenPaw。已请求重新加载不代表加载完成。
+- 在所选智能体的新对话中发送：**请调用 companion_get_state 和 companion_get_notes，告诉我当前心情及便签。** 然后返回绑定页刷新状态。
+- 仅当插件实际执行了工具且宿主提供当前智能体上下文时，才显示该智能体最近一次调用的工具名、时间及成功/失败。记录保留在内存中，重启后清空，不保存对话内容。无记录不等于一定不能使用。
+- 工具已启用只代表配置就绪；模型需支持工具调用，并实际选择调用。各智能体共享本插件现有数据，绑定不会创建独立数据副本。
+- 系统提示只向启用了陪伴工具的智能体提供，并仅列出其已启用的工具。标准 router 模式无法直接注册智能体工具，页面明确提示不支持；仍可使用 REST API 和技能模板。
+
+绑定 API：`GET /api/companion-core/agents` 查询状态；`PUT /api/companion-core/agents/{agent_id}/binding`，请求体 `{"enabled":true}` 或 `{"enabled":false}`。旧版 router 前缀同前文。
+
+绑定使用官方源码中的 `load_config`、`load_agent_config`、`save_agent_config`、`BuiltinToolConfig` 和 `schedule_agent_reload`，与宿主工具开关机制一致。真实宿主的模型调用仍需按上述步骤验证，测试替身不代表真实 AI 已调用成功。
 
 ## 🗂 数据存储
 

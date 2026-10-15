@@ -41,12 +41,13 @@ import os
 import re
 import shutil
 import threading
+from functools import wraps
 from uuid import uuid4
 from datetime import date, datetime
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 try:
@@ -61,6 +62,12 @@ logger = logging.getLogger(__name__)
 PLUGIN_VERSION = json.loads((Path(__file__).resolve().parent / "plugin.json").read_text(encoding="utf-8"))["version"]
 PLUGIN_NAME = "陪伴核心"
 PLUGIN_ID = "companion-core"
+TOOL_NAMES = tuple(item["name"] for item in json.loads(
+    (Path(__file__).resolve().parent / "plugin.json").read_text(encoding="utf-8")
+)["meta"]["tools"])
+_binding_lock = threading.Lock()
+_call_history = {}  # Bounded latest call per agent; no conversation content stored.
+
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
 _DATA_DIR = Path(os.environ.get(
@@ -678,6 +685,111 @@ def health():
     }
 
 
+# ==================== 智能体绑定 ====================
+
+class AgentBindingUpdate(BaseModel):
+    enabled: bool
+
+
+def _host_config_api():
+    try:
+        from qwenpaw.config.utils import load_config
+        from qwenpaw.config.config import (
+            BuiltinToolConfig, load_agent_config, save_agent_config,
+        )
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="宿主不提供智能体配置接口，请在 QwenPaw 工具设置中启用陪伴工具") from exc
+    return load_config, load_agent_config, save_agent_config, BuiltinToolConfig
+
+
+def _agent_binding_row(agent_id, ref, config):
+    entries = config.tools.builtin_tools if config.tools else {}
+    enabled = [name for name in TOOL_NAMES if name in entries and entries[name].enabled]
+    with _binding_lock:
+        last_call = dict(_call_history[agent_id]) if agent_id in _call_history else None
+    return {
+        "id": agent_id, "name": getattr(ref, "name", None) or agent_id,
+        "agent_enabled": getattr(ref, "enabled", True),
+        "enabled_tools": enabled, "total_tools": len(TOOL_NAMES),
+        "binding": "bound" if len(enabled) == len(TOOL_NAMES) else "partial" if enabled else "unbound",
+        "last_call": last_call,
+    }
+
+
+@router.get("/agents")
+def companion_agents():
+    if app is None:
+        return {"supported": False, "reason": "当前为标准 router 模式，未注册 AI 工具。请使用支持 PawApp SDK 的 QwenPaw 宿主。", "agents": []}
+    load_config, load_agent_config, _, _ = _host_config_api()
+    config = load_config()
+    rows = []
+    for agent_id, ref in config.agents.profiles.items():
+        try:
+            rows.append(_agent_binding_row(agent_id, ref, load_agent_config(agent_id)))
+        except Exception:
+            logger.exception("Cannot read companion binding for agent %s", agent_id)
+            rows.append({"id": agent_id, "name": agent_id, "binding": "unknown", "error": "无法读取智能体配置"})
+    return {"supported": True, "agents": rows, "tools": list(TOOL_NAMES)}
+
+
+@router.put("/agents/{agent_id}/binding")
+async def set_companion_binding(agent_id: str, payload: AgentBindingUpdate, request: Request):
+    if app is None:
+        raise HTTPException(status_code=503, detail="当前宿主未注册 AI 工具，无法绑定")
+    load_config, load_agent_config, save_agent_config, tool_class = _host_config_api()
+    with _binding_lock:
+        config = load_config()
+        if agent_id not in config.agents.profiles:
+            raise HTTPException(status_code=404, detail="智能体不存在")
+        ref = config.agents.profiles[agent_id]
+        if payload.enabled and not getattr(ref, "enabled", True):
+            raise HTTPException(status_code=409, detail="请先在 QwenPaw 中启用该智能体")
+        agent_config = load_agent_config(agent_id)
+        if agent_config.tools is None:
+            raise HTTPException(status_code=409, detail="该智能体缺少工具配置，请先在宿主中初始化工具")
+        entries = agent_config.tools.builtin_tools
+        for name in TOOL_NAMES:
+            if name not in entries:
+                entries[name] = tool_class(name=name, enabled=payload.enabled, config={})
+            else:
+                entries[name].enabled = payload.enabled
+        save_agent_config(agent_id, agent_config)
+    reload_scheduled = False
+    try:
+        from qwenpaw.app.utils import schedule_agent_reload
+        reload_scheduled = schedule_agent_reload(request, agent_id) is True
+    except Exception:
+        logger.exception("Companion binding saved; agent reload unavailable")
+    row = _agent_binding_row(agent_id, ref, load_agent_config(agent_id))
+    return {"agent": row, "reload_scheduled": reload_scheduled,
+            "message": "配置已保存，已请求宿主重新加载；请在新对话中验证实际调用。" if reload_scheduled else "配置已保存；请在宿主重新加载智能体或重启 QwenPaw 后再验证。"}
+
+
+def _current_agent_id():
+    try:
+        from qwenpaw.app import agent_context
+        # get_current_agent_id falls back to the UI's active agent, which can
+        # misattribute calls. Only trust an explicitly set execution context.
+        peek = getattr(agent_context, "peek_current_agent_id", None)
+        if peek is not None:
+            return peek() or None
+        context = getattr(agent_context, "_current_agent_id", None)
+        return context.get() if context is not None else None
+    except (ImportError, RuntimeError):
+        return None
+
+
+def _record_tool_call(tool_name, status):
+    agent_id = _current_agent_id()
+    if not agent_id:
+        return
+    with _binding_lock:
+        if len(_call_history) >= 256 and agent_id not in _call_history:
+            _call_history.pop(next(iter(_call_history)))
+        _call_history[agent_id] = {"tool": tool_name, "status": status,
+                                   "at": datetime.now().astimezone().isoformat(timespec="seconds")}
+
+
 # ── PawApp definition + lifecycle ────────────────────────────────────
 
 app = PawApp(name=PLUGIN_NAME, app_id=PLUGIN_ID) if PawApp else None
@@ -685,10 +797,19 @@ if app is not None:
     app.include_router(router)
 
 
-def _agent_tool(*args, **kwargs):
-    if app is not None:
-        return app.tool(*args, **kwargs)
-    return lambda function: function
+def _agent_tool(name, **kwargs):
+    def decorate(function):
+        @wraps(function)
+        async def tracked(*args, **call_kwargs):
+            try:
+                result = await function(*args, **call_kwargs)
+            except Exception:
+                _record_tool_call(name, "error")
+                raise
+            _record_tool_call(name, "success")
+            return result
+        return app.tool(name, **kwargs)(tracked) if app is not None else tracked
+    return decorate
 
 
 def _text_response(text):
@@ -905,6 +1026,18 @@ async def companion_get_important_dates():
 
 def _build_prompt(agent) -> str:
     """动态构建系统提示，包含当前数据摘要。"""
+    agent_id = _current_agent_id()
+    if not agent_id:
+        return ""
+    try:
+        _, load_agent_config, _, _ = _host_config_api()
+        config = load_agent_config(agent_id)
+        entries = config.tools.builtin_tools if config.tools else {}
+        enabled = [name for name in TOOL_NAMES if name in entries and entries[name].enabled]
+    except Exception:
+        return ""
+    if not enabled:
+        return ""
     today = _today_str()
     parts = [
         "【陪伴核心系统】用户安装了陪伴核心插件。你可以通过以下工具访问陪伴数据：",
@@ -918,6 +1051,7 @@ def _build_prompt(agent) -> str:
         "当用户询问你的状态、心情、便签、日程或关系时，请调用相应工具获取数据后自然回应。",
         "保持人设语气，不要暴露技术细节。",
     ]
+    parts = [line for line in parts if not line.startswith("- companion_") or line.split(":", 1)[0][2:] in enabled]
     with _lock:
         notes = _read_notes()
     active_notes = [n for n in notes if not _is_expired(n, today)]

@@ -116,3 +116,104 @@ def test_anniversaries_use_valid_leap_day(loaded):
     module, _, _, _ = loaded
     assert module._days_until_anniversary('2020-02-29', date(2026, 10, 15)) == (date(2028, 2, 29) - date(2026, 10, 15)).days
     assert module._days_until_anniversary('2000-10-15', date(2026, 10, 15)) == 0
+
+
+@pytest.fixture
+def binding_host(loaded, monkeypatch):
+    from copy import deepcopy
+    from types import SimpleNamespace as NS
+    module, client, _, sdk = loaded
+    profiles = {'alice': NS(name='Alice', enabled=True), 'bob': NS(name='Bob', enabled=True),
+                'off': NS(name='Off', enabled=False)}
+    saved = {key: NS(tools=NS(builtin_tools={'unrelated': NS(name='unrelated', enabled=True, config={'keep':1})})) for key in profiles}
+    saves = []
+    def save(key, value):
+        saved[key] = deepcopy(value)
+        saves.append(key)
+    monkeypatch.setattr(module, '_host_config_api', lambda: (
+        lambda: NS(agents=NS(profiles=profiles)), lambda key: deepcopy(saved[key]), save,
+        lambda **kw: NS(**kw)))
+    reloads = []
+    utils = types.ModuleType('qwenpaw.app.utils')
+    utils.schedule_agent_reload = lambda request, agent_id: reloads.append(agent_id) or True
+    monkeypatch.setitem(sys.modules, 'qwenpaw.app.utils', utils)
+    return module, client, sdk, saved, saves, reloads
+
+
+def test_binding_config_and_unbinding_are_agent_scoped(binding_host):
+    module, client, sdk, saved, saves, reloads = binding_host
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
+    status = client.get(prefix + '/agents').json()
+    if not sdk:
+        assert status['supported'] is False
+        assert client.put(prefix + '/agents/alice/binding', json={'enabled':True}).status_code == 503
+        assert not saves
+        return
+    assert all(row['binding'] == 'unbound' for row in status['agents'])
+    bound = client.put(prefix + '/agents/alice/binding', json={'enabled':True})
+    assert bound.status_code == 200, bound.text
+    assert bound.json()['agent']['binding'] == 'bound'
+    assert bound.json()['reload_scheduled'] is True
+    assert reloads == ['alice']
+    assert all(saved['alice'].tools.builtin_tools[name].enabled for name in module.TOOL_NAMES)
+    assert saved['alice'].tools.builtin_tools['unrelated'].config == {'keep':1}
+    assert len(saved['bob'].tools.builtin_tools) == 1
+    assert client.put(prefix + '/agents/unknown/binding', json={'enabled':True}).status_code == 404
+    assert client.put(prefix + '/agents/off/binding', json={'enabled':True}).status_code == 409
+    assert saves == ['alice']
+    unbound = client.put(prefix + '/agents/alice/binding', json={'enabled':False}).json()
+    assert unbound['agent']['binding'] == 'unbound'
+    assert saved['alice'].tools.builtin_tools['unrelated'].enabled
+
+
+def test_actual_tool_call_tracking_and_prompt_scope(binding_host, monkeypatch):
+    import asyncio
+    module, client, sdk, _, _, _ = binding_host
+    if not sdk:
+        return
+    prefix = '/api/companion-core'
+    client.put(prefix + '/agents/alice/binding', json={'enabled':True})
+    monkeypatch.setattr(module, '_current_agent_id', lambda: 'alice')
+    assert 'companion_get_state' in module._build_prompt(None)
+    asyncio.run(module.companion_get_state())
+    rows = client.get(prefix + '/agents').json()['agents']
+    alice = next(row for row in rows if row['id']=='alice')
+    assert alice['last_call']['tool'] == 'companion_get_state'
+    assert alice['last_call']['status'] == 'success'
+    assert next(row for row in rows if row['id']=='bob')['last_call'] is None
+    monkeypatch.setattr(module, '_current_agent_id', lambda: 'bob')
+    assert module._build_prompt(None) == ''
+    monkeypatch.setattr(module, '_current_agent_id', lambda: None)
+    asyncio.run(module.companion_get_notes())
+    assert None not in module._call_history
+
+
+def test_binding_reload_failure_is_not_reported_as_live(binding_host, monkeypatch):
+    module, client, sdk, _, _, _ = binding_host
+    if not sdk:
+        return
+    monkeypatch.setattr(sys.modules['qwenpaw.app.utils'], 'schedule_agent_reload', lambda *args: False)
+    result = client.put('/api/companion-core/agents/alice/binding', json={'enabled':True}).json()
+    assert result['agent']['binding'] == 'bound'
+    assert result['reload_scheduled'] is False
+    assert '重启' in result['message']
+
+
+def test_no_active_ui_agent_fallback_for_call_tracking(loaded, monkeypatch):
+    from contextvars import ContextVar
+    module, _, _, _ = loaded
+    app_package = types.ModuleType('qwenpaw.app')
+    context_module = types.ModuleType('qwenpaw.app.agent_context')
+    context_module.get_current_agent_id = lambda: 'wrong-active-ui-agent'
+    context_module._current_agent_id = ContextVar('test_agent', default=None)
+    app_package.agent_context = context_module
+    monkeypatch.setitem(sys.modules, 'qwenpaw.app', app_package)
+    monkeypatch.setitem(sys.modules, 'qwenpaw.app.agent_context', context_module)
+    assert module._current_agent_id() is None
+    module._record_tool_call('companion_get_state', 'success')
+    assert not module._call_history
+    token = context_module._current_agent_id.set('real-agent')
+    try:
+        assert module._current_agent_id() == 'real-agent'
+    finally:
+        context_module._current_agent_id.reset(token)

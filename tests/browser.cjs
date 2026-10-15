@@ -6,10 +6,17 @@ fs.mkdirSync(output,{recursive:true});
 const modules=path.dirname(path.dirname(require.resolve('react/package.json')));
 const today=new Date().toLocaleDateString('en-CA');
 const db={state:{date:today,mood:'平静而充实',energy:78,sleep:'昨晚睡了 8 小时',health:'状态不错',hunger:'刚刚好',dream:'穿过一片森林',note:'给自己留一点慢下来的时间'},schedule:{date:today,plan:[{time:'09:00',activity:'读书与晨间整理',mood:'期待'},{time:'14:00',activity:'去公园散步',mood:'放松'},{time:'20:30',activity:'记录今天的小确幸',mood:'平静'}]},notes:[{id:'n1',content:'周末一起去看展，记得提前预约。',created_at:today,expires_at:'',reminded:false},{id:'n2',content:'给家里的绿植浇水',created_at:today,expires_at:'',reminded:false}],relationship:{warmth_score:82,notes:'一起积累平凡而闪亮的日子。',milestones:[{date:'2026-10-01',event:'第一次一起看日落'}]},dates:{dates:[{name:'相遇纪念日',date:today,note:'记得这一天'},{name:'生日',date:'2000-12-20',note:'准备一份小惊喜'}]},dreams:[{date:today,content:'# '+today+' 的梦\n\n梦见穿过一片森林，树叶闪着光。'}]};
+db.agents={supported:true,agents:[{id:'alice',name:'测试智能体',agent_enabled:true,binding:'unbound',enabled_tools:[],total_tools:7,last_call:null}]};
+let bindingWrites=0;
 const scriptFiles={'/react.js':'react/umd/react.development.js','/react-dom.js':'react-dom/umd/react-dom.development.js','/dayjs.js':'dayjs/dayjs.min.js','/antd.js':'antd/dist/antd.min.js','/reset.css':'antd/dist/reset.css'};
 const server=http.createServer(async(req,res)=>{
  if(req.url.startsWith('/api/companion-core/')){
   const endpoint=req.url.replace('/api/companion-core/','').split('?')[0];let body='';for await(const c of req)body+=c;const payload=body?JSON.parse(body):{};
+  if(endpoint==='agents/alice/binding' && req.method==='PUT'){
+   bindingWrites++;
+   const agent=db.agents.agents[0];agent.binding=payload.enabled?'bound':'unbound';agent.enabled_tools=payload.enabled?Array(7).fill('tool'):[];
+   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({agent,reload_scheduled:true,message:'配置已保存，已请求宿主重新加载'}));return;
+  }
   if(req.method==='PUT'){
    if(endpoint.startsWith('notes/'))Object.assign(db.notes.find(n=>n.id===endpoint.split('/')[1]),payload);
    else Object.assign(db[endpoint],payload);
@@ -38,13 +45,32 @@ const server=http.createServer(async(req,res)=>{
   await page.getByRole('textbox',{name:'搜索记录…'}).fill('不会匹配');await page.getByText('没有匹配的记录',{exact:true}).waitFor();await page.getByRole('textbox',{name:'搜索记录…'}).fill('预约');await page.getByText('修改后的预约提醒',{exact:true}).waitFor();
   await page.waitForFunction(()=>!document.querySelector('.ant-message-notice'));
   await page.screenshot({path:path.join(output,'notes-desktop.png'),fullPage:true});
+  await page.getByRole('tab',{name:'智能体绑定'}).click();
+  await page.getByText('测试智能体',{exact:false}).waitFor();
+  await page.getByText('尚未观察到调用（仅记录本次插件运行期间）',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'绑定并启用工具'}).click();
+  await page.getByText('工具启用数: 7/7',{exact:true}).waitFor();
+  assert.equal(bindingWrites,1);
+  // A mock host call record is shown only after a subsequent status read.
+  db.agents.agents[0].last_call={tool:'companion_get_state',status:'success',at:'2026-10-15T20:00:00+08:00'};
+  await page.getByRole('button',{name:'刷新状态'}).click();
+  await page.getByText(/最近实际调用: companion_get_state/).waitFor();
+  await page.screenshot({path:path.join(output,'agent-binding.png'),fullPage:true});
+  await page.getByRole('button',{name:'解除绑定'}).click();
+  await page.getByText('工具启用数: 0/7',{exact:true}).waitFor();
+  assert.equal(bindingWrites,2);
   await page.setViewportSize({width:390,height:844});await page.getByRole('tab',{name:'今日总览'}).click();await page.getByText('平静而充实',{exact:true}).waitFor();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
   await page.screenshot({path:path.join(output,'overview-mobile.png'),fullPage:true});
   // Check row-heavy screens on a narrow viewport too.
-  for(const name of ['日程','便签','重要日期']){await page.getByRole('tab',{name}).click();await page.waitForTimeout(200);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overflow in '+name);}
+  for(const name of ['日程','便签','重要日期','智能体绑定']){await page.getByRole('tab',{name}).click();await page.waitForTimeout(200);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overflow in '+name);}
   await page.setViewportSize({width:1280,height:1000});await page.goto(url+'?dark');await page.getByText('平静而充实',{exact:true}).waitFor();await page.screenshot({path:path.join(output,'overview-dark.png'),fullPage:true});
   await page.goto(url+'?en');await page.getByRole('tab',{name:'Overview'}).waitFor();await page.getByText('Current mood',{exact:true}).waitFor();
-  assert.deepEqual(errors,[]);console.log('Browser passed: overview, schedule edit, note edit/search, 390px layouts, dark theme, English; no page errors');
+  await page.getByRole('tab',{name:'Agent binding'}).click();
+  await page.getByRole('button',{name:'Bind and enable tools'}).waitFor();
+  db.agents={supported:false,reason:'宿主未注册 AI 工具',agents:[]};
+  await page.getByRole('button',{name:'Refresh status'}).click();
+  await page.getByText('宿主未注册 AI 工具',{exact:true}).waitFor();
+  assert.deepEqual(errors,[]);console.log('Browser passed: overview, schedule edit, note edit/search, 390px layouts, dark theme, English, agent bind/unbind/status and unsupported host; no page errors');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
