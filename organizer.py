@@ -512,6 +512,11 @@ class ChatOrganizer:
 def install(router, core):
     organizer = ChatOrganizer(core)
     organizer.register_auto()
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('companion_file_backfill', Path(__file__).parent / 'file_backfill.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    organizer.backfill = module.install(router, organizer)
     @router.get('/organizer/config')
     def get_settings():
         return organizer.view()

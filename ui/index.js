@@ -46,6 +46,10 @@
 
   var MESSAGES = {
     zh: {
+      bfTitle:"从工作区文件回填", bfInferNames:"推断称呼（仅本地）", bfIntro:"手动读取 → 编辑脱敏来源 → 审阅发送全文 → 确认发送 → 预览并确认写入。不会加入自动聊天整理。",
+      bfPrivacy:"正则脱敏不能识别所有秘密，请逐字检查并删除敏感内容；建议使用本地免密模型。AGENTS.md 不读取，agent.json 只在本地取 name，不发送配置或密钥。PROFILE 上限 4000 字符，MEMORY 3000，近期最多 3 篇共 2000，SOUL 风格 1500。",
+      bfModules:"将使用已启用的回填模块", bfNamesOnly:"仅本地称呼预览，不调用模型", bfStyle:"仅风格", bfRead:"读取来源（不调用模型）", bfReview:"生成发送全文（不调用模型）", bfCandidateHint:"候选称呼标明来源。现有称呼优先保留；如需替换请手动修改输入框。PROFILE 显式资料优先，无法确定的称呼不推断。", bfTruncated:"已截断", bfOutbound:"将要发送的完整请求", bfFrozen:"下面显示每个模块的接收地址、模型与完整消息。确认后只发送这份快照；模型配置或当前数据变化会要求重新审阅。确认发送会消耗模型额度。", bfProfileLocal:"称呼变更仅在本地处理，确认写入前不保存：", bfConsent:"我已检查全文与接收地址，确认继续；模型请求完成后仍需另行确认写入。", bfSend:"确认发送并生成结果预览", bfLocalPreview:"生成本地称呼结果预览",
+
       tabAbout:"关于", aboutCredit:"由番星与 GPT 联合制作", aboutIntro:"为 QwenPaw 提供状态、日程、梦境、便签、关系与重要日期管理。",
       aboutVersion:"当前版本", aboutRepo:"GitHub 源码", aboutReleases:"版本与下载", aboutIssues:"反馈问题", aboutLicense:"MIT 开源协议", aboutThanks:"灵感与功能设计来源于 astrbot_plugin_private_companion，感谢原作者的贡献。",
 
@@ -111,6 +115,10 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
+      bfTitle:"Backfill from workspace files", bfInferNames:"Infer names (local only)", bfIntro:"Read → edit redacted sources → inspect full requests → confirm sending → preview and confirm saving. Never runs automatically with chats.",
+      bfPrivacy:"Redaction cannot detect every secret. Inspect the full text and remove sensitive content; prefer a local keyless model. AGENTS.md is excluded. Only agent.json name is read locally; configuration and keys are never sent. Limits: PROFILE 4000 chars, MEMORY 3000, up to 3 recent files totaling 2000, SOUL style 1500.",
+      bfModules:"Enabled backfill modules", bfNamesOnly:"Local name preview only; no model calls", bfStyle:"style only", bfRead:"Read sources (no model call)", bfReview:"Build full request preview (no model call)", bfCandidateHint:"Name candidates include provenance. Existing names are preserved unless you edit them. Explicit PROFILE fields take priority; uncertain names are not inferred.", bfTruncated:"truncated", bfOutbound:"Complete outgoing requests", bfFrozen:"Inspect each recipient, model and complete message. Only this frozen snapshot is sent. Changed settings or data require a new review. Sending uses model credits.", bfProfileLocal:"Name changes are local and saved only after confirmation:", bfConsent:"I inspected the complete text and recipients and confirm continuing. Saving still requires a separate confirmation.", bfSend:"Confirm sending and preview results", bfLocalPreview:"Preview local name changes",
+
       tabAbout:"About", aboutCredit:"Jointly created by 番星 and GPT", aboutIntro:"State, schedules, dreams, notes, relationships and important dates for QwenPaw.",
       aboutVersion:"Current version", aboutRepo:"GitHub source", aboutReleases:"Releases & downloads", aboutIssues:"Report an issue", aboutLicense:"MIT License", aboutThanks:"Inspired by astrbot_plugin_private_companion. Thanks to its original author.",
 
@@ -346,6 +354,10 @@
     organizerConfig: function () { return apiFetch("/companion-core/organizer/config"); },
     saveOrganizer: function (data) { return apiFetch("/companion-core/organizer/config", {method:"PUT",body:data}); },
     organizerChats: function (id) { return apiFetch("/companion-core/organizer/chats?agent_id=" + encodeURIComponent(id)); },
+    backfillSources: function(body){return apiFetch("/companion-core/organizer/backfill/sources",{method:"POST",body:body});},
+    backfillReview: function(body){return apiFetch("/companion-core/organizer/backfill/review",{method:"POST",body:body});},
+    backfillPreview: function(body){return apiFetch("/companion-core/organizer/backfill/preview",{method:"POST",body:body});},
+    backfillApply: function(id){return apiFetch("/companion-core/organizer/backfill/apply",{method:"POST",body:{preview_id:id}});},
     organizerPreview: function (agent,chat) { return apiFetch("/companion-core/organizer/preview", {method:"POST",body:{agent_id:agent,chat_id:chat}}); },
     organizerApply: function (id) { return apiFetch("/companion-core/organizer/apply", {method:"POST",body:{preview_id:id}}); },
     agents: function () { return apiFetch("/companion-core/agents"); },
@@ -946,6 +958,60 @@
           h(Button,{type:"primary",loading:busy,disabled:busy||!config,onClick:function(){complete(false);}},t("setupFinish"))));
   }
 
+  function FileBackfillPanel(props) {
+    var t=props.t,C=props.C;
+    var a=useState({profile:true,memory:true,recent:true,style:false}),flags=a[0],setFlags=a[1];
+    var ds=useState(null),draft=ds[0],setDraft=ds[1];
+    var ts=useState({}),texts=ts[0],setTexts=ts[1];
+    var ps=useState({}),profile=ps[0],setProfile=ps[1];
+    var rs=useState(null),review=rs[0],setReview=rs[1];
+    var vs=useState(null),preview=vs[0],setPreview=vs[1];
+    var bs=useState(false),busy=bs[0],setBusy=bs[1];
+    var es=useState(''),error=es[0],setError=es[1];
+    var cs=useState(false),confirmed=cs[0],setConfirmed=cs[1];
+    var ls=useState(false),localOnly=ls[0],setLocalOnly=ls[1];
+    useEffect(function(){setDraft(null);setReview(null);setPreview(null);setConfirmed(false);},[props.agentId,props.dirty]);
+    function run(fn){if(busy)return;setBusy(true);setError('');Promise.resolve().then(fn).catch(function(e){setError(e.message);}).then(function(){setBusy(false);});}
+    function clear(){setDraft(null);setReview(null);setPreview(null);setConfirmed(false);}
+    function read(onlyNames){setLocalOnly(onlyNames);run(function(){return api.backfillSources(Object.assign({agent_id:props.agentId},onlyNames?{profile:true,memory:false,recent:false,style:false}:flags)).then(function(data){
+      setDraft(data);setReview(null);setPreview(null);setConfirmed(false);
+      var values={},names=Object.assign({},data.current_profile);
+      data.documents.forEach(function(doc){values[doc.name]=doc.text;});
+      data.candidates.forEach(function(candidate){if(!names[candidate.field])names[candidate.field]=candidate.value;});
+      setTexts(values);setProfile(names);
+    });});}
+    function build(){run(function(){return api.backfillReview({source_id:draft.source_id,texts:texts,profile:profile,modules:localOnly?[]:props.modules}).then(function(data){setReview(data);setPreview(null);setConfirmed(false);});});}
+    function generate(){run(function(){return api.backfillPreview({review_id:review.review_id,confirmed:confirmed}).then(function(data){setPreview(data);setReview(null);setConfirmed(false);});});}
+    function apply(){run(function(){return api.backfillApply(preview.preview_id).then(function(){clear();setError(t('orgApplied'));props.onApplied();});});}
+    function json(value){return h('pre',{style:{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:400,overflow:'auto',fontSize:12}},JSON.stringify(value,null,2));}
+    return h('details',{style:{margin:'20px 0',border:C.border,borderRadius:12,padding:16}},
+      h('summary',{style:{cursor:'pointer',fontWeight:600}},t('bfTitle')),
+      h('p',null,t('bfIntro')),h('p',null,t('bfPrivacy')),
+      h('p',null,t('bfModules')+': '+((localOnly?[]:props.modules).join(', ')||t('bfNamesOnly'))),
+      h('div',{style:{display:'flex',gap:16,flexWrap:'wrap'}},Object.keys(flags).map(function(key){return h('label',{key:key},h('input',{type:'checkbox',checked:flags[key],disabled:busy,onChange:function(e){var next=Object.assign({},flags);next[key]=e.target.checked;setFlags(next);clear();}}),' '+({profile:'PROFILE.md + agent.json / SOUL name',memory:'MEMORY.md',recent:'memory/*.md',style:'SOUL.md ('+t('bfStyle')+')'})[key]);})),
+      h(Button,{style:{margin:'12px 12px 0 0'},disabled:busy||props.dirty||!props.agentId,onClick:function(){read(true);}},t('bfInferNames')),
+      h(Button,{style:{marginTop:12},disabled:busy||props.dirty||!props.agentId,onClick:function(){read(false);}},t('bfRead')),
+      error?h('p',{role:'status',style:{whiteSpace:'pre-wrap'}},error):null,
+      draft?h('div',null,
+        h('p',null,t('bfCandidateHint')),
+        draft.candidates.map(function(item){return h('p',{key:item.field},item.field+': '+item.value+' ← '+item.source);}),
+        ['user_name','companion_name'].map(function(key){return h(EditorRow,{key:key,label:t(key==='user_name'?'setupUser':'setupCompanion'),C:C},h(Input,{'aria-label':'backfill '+key,value:profile[key]||'',maxLength:80,disabled:busy,onChange:function(e){var next=Object.assign({},profile);next[key]=e.target.value;setProfile(next);setReview(null);setPreview(null);}}));}),
+        draft.notices.map(function(item,i){return h('p',{key:i},item.file+': '+item.message);}),
+        draft.documents.map(function(doc){return h('details',{key:doc.name,open:true,style:{marginTop:12}},
+          h('summary',null,doc.name+' · '+doc.role+' · '+texts[doc.name].length+'/'+doc.budget+(doc.truncated?' · '+t('bfTruncated'):'')),
+          h(TextArea,{'aria-label':'backfill '+doc.name,rows:5,maxLength:doc.budget,value:texts[doc.name],disabled:busy,onChange:function(e){var next=Object.assign({},texts);next[doc.name]=e.target.value;setTexts(next);setReview(null);setPreview(null);}}));}),
+        h(Button,{disabled:busy,onClick:build,style:{marginTop:12}},t('bfReview'))):null,
+      review?h('section',null,h('h3',null,t('bfOutbound')),h('p',null,t('bfFrozen')),
+        h('p',null,t('bfProfileLocal')),json(review.profile),
+        review.requests.map(function(req){return h('article',{key:req.module},h('h4',null,req.module+' → '+req.endpoint),json(req));}),
+        !review.requests.length?h('p',null,t('bfNamesOnly')):null,
+        h('label',null,h('input',{type:'checkbox',checked:confirmed,disabled:busy,onChange:function(e){setConfirmed(e.target.checked);}}),' '+t('bfConsent')),
+        h('div',{style:{marginTop:12}},h(Button,{type:'primary',loading:busy,disabled:busy||!confirmed,onClick:generate},t(review.requests.length?'bfSend':'bfLocalPreview')))):null,
+      preview?h('section',null,h('h3',null,t('orgPreviewHint')),json(preview.changes),h('p',null,t('orgUsage')),json(preview.usage),
+        h(Button,{type:'primary',disabled:busy||!Object.keys(preview.changes).length,onClick:apply},t('orgApply'))):null,
+      draft?h(Button,{disabled:busy,onClick:clear,style:{margin:'12px 0 0 12px'}},t('orgDiscard')):null);
+  }
+
   function OrganizerTab(props) {
     var t=props.t, C=props.C;
     var s=useAsync(function(){return Promise.all([api.organizerConfig(),api.agents()]);},[]);
@@ -995,6 +1061,7 @@
         h("option",{value:""},t("orgChooseAgent")),agents.filter(function(a){return a.enabled_tools && a.enabled_tools.length && a.agent_enabled!==false;}).map(function(a){return h("option",{key:a.id,value:a.id},a.name+" ("+a.id+")");}))),
       field(t("orgChat"),h("select",{value:chat,disabled:busy,style:selectStyle,"aria-label":t("orgChat"),onChange:function(e){setChat(e.target.value);setPreview(null);}},
         h("option",{value:""},t("orgChooseChat")),chats.map(function(item){return h("option",{key:item.id,value:item.id},item.name+" · "+item.updated_at);}))),
+      h(FileBackfillPanel,{t:t,C:C,agentId:agentId,dirty:dirty,modules:['relationship','dates'].filter(function(key){return form.modules[key].enabled;}),onApplied:function(){s.retry();if(props.onApplied)props.onApplied();}}),
       number("orgMessages","recent_messages",2,200),number("orgChars","max_context_chars",1000,64000),number("orgTokens","max_output_tokens",128,4096),
       field(t("orgAuto"),h(Switch,{checked:form.auto_enabled,disabled:busy||!meta.auto_supported,onChange:function(v){update("auto_enabled",v);}})),
       h("p",{style:{color:C.sub,lineHeight:1.8}},t("orgAutoHint")),
@@ -1242,7 +1309,7 @@
           { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { key:revision, t: t, C: C }) },
           { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { key:revision, t: t, C: C }) },
           { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C }) },
-          { key: "organizer", label: "✨ " + t("tabOrganizer"), children: h(OrganizerTab, { t:t, C:C, onApplied:function(){setRevision(function(v){return v+1;});} }) },
+          { key: "organizer", label: "✨ " + t("tabOrganizer"), children: h(OrganizerTab, { t:t, C:C, onApplied:function(){setRevision(function(v){return v+1;});api.setup().then(setSetupData).catch(function(error){console.warn("[companion-core] setup refresh failed",error);});} }) },
           { key: "agents", label: "🤖 " + t("tabAgents"), children: h(AgentsTab, { t:t, C:C }) },
           { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
           { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },

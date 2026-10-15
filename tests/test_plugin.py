@@ -401,7 +401,11 @@ def test_organizer_real_http_contract_and_redirect_secret_protection(organizer_h
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     try:
         base='http://127.0.0.1:'+str(server.server_port)
-        changes,usage=organizer.complete((base+'/v1','small-model','test-key'),[{'role':'user','content':'test'}],128)
+        try:
+            changes,usage=organizer.complete((base+'/v1','small-model','test-key'),[{'role':'user','content':'test'}],128)
+        except Exception as exc:
+            # Only exception type and test-server contact; never log headers or credentials.
+            raise AssertionError(f'Local HTTP contract: {type(exc.__context__).__name__}, reached_server={bool(requests)}') from exc
         assert changes=={'mood':'快乐'} and usage['total_tokens']==20
         assert requests[0][0]=='/v1/chat/completions'
         assert requests[0][1]=='Bearer test-key'
@@ -535,3 +539,184 @@ def test_private_record_permissions_and_preserved_contents(loaded):
     for path in paths:
         assert path.stat().st_mode & 0o777 == 0o600
         assert path.read_bytes() == before[path]
+
+
+@pytest.fixture
+def file_host(organizer_host, tmp_path):
+    module, client, sdk, prefix, owner, workspace, *_ = organizer_host
+    root = tmp_path/'agent-workspace'
+    root.mkdir()
+    workspace.workspace_dir = root
+    (root/'PROFILE.md').write_text('- user_name: 番星\n背景: 开发者\n密码: never-share-profile\n',encoding='utf-8')
+    (root/'agent.json').write_text(json.dumps({'name':'小伴','api_key':'never-share-agent'}),encoding='utf-8')
+    (root/'SOUL.md').write_text('name: 后备名称\n风格标记: 技术小跟班\nsecret: never-share-soul\n',encoding='utf-8')
+    (root/'MEMORY.md').write_text('用户称呼是旧名字。\n生日: 2000-02-04\npassword: never-share-password\nserver: 192.0.2.99\nAPI Key:\n  never-share-multiline\n'+('x'*4000),encoding='utf-8')
+    (root/'AGENTS.md').write_text('NEVER READ AGENTS',encoding='utf-8')
+    (root/'memory').mkdir()
+    for i in range(1,5):
+        (root/'memory'/f'2026-10-{i:02d}.md').write_text('2026-10-01 第一次修 bug。'+('r'*900),encoding='utf-8')
+    return module,client,sdk,prefix,owner,root
+
+
+def test_backfill_name_inference_is_local_and_preserves_data(file_host, monkeypatch):
+    module,client,sdk,prefix,owner,root = file_host
+    endpoint=prefix+'/organizer/backfill'
+    def forbidden(*args): raise AssertionError('names must not call models')
+    monkeypatch.setattr(owner,'complete',forbidden)
+    response=client.post(endpoint+'/sources',json={'agent_id':'alice','memory':False,'recent':False})
+    if not sdk:
+        assert response.status_code==503
+        return
+    assert response.status_code==200
+    source=response.json()
+    assert {item['field']:item['value'] for item in source['candidates']}=={'user_name':'番星','companion_name':'小伴'}
+    assert [doc['name'] for doc in source['documents']]==['PROFILE.md']
+    assert 'never-share' not in response.text
+    assert 'agent.json' not in {doc['name'] for doc in source['documents']}
+    before=owner.snapshot()
+    review=client.post(endpoint+'/review',json={'source_id':source['source_id'],'profile':{'user_name':'番星','companion_name':'小伴'}}).json()
+    assert review['requests']==[]
+    assert not (module._DATA_DIR/'setup.json').exists()
+    assert client.post(endpoint+'/preview',json={'review_id':review['review_id']}).status_code==400
+    preview=client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).json()
+    assert not (module._DATA_DIR/'setup.json').exists()
+    assert client.post(endpoint+'/apply',json={'preview_id':preview['preview_id']}).status_code==200
+    assert owner.snapshot()==before
+    setup=client.get(prefix+'/setup').json()
+    assert setup['profile']=={'user_name':'番星','companion_name':'小伴'}
+    assert setup['completed'] is False
+    assert (module._DATA_DIR/'setup.json').stat().st_mode&0o777==0o600
+    backup=json.loads(next((module._DATA_DIR/'organizer-backups').glob('*.json')).read_text())
+    assert backup['setup']=={}
+    assert client.post(endpoint+'/apply',json={'preview_id':preview['preview_id']}).status_code==410
+
+
+def test_backfill_soul_name_fallback_and_current_name_conflict(file_host):
+    module,client,sdk,prefix,owner,root=file_host
+    if not sdk:return
+    endpoint=prefix+'/organizer/backfill'
+    (root/'agent.json').unlink()
+    client.post(prefix+'/setup',json={'user_name':'现有称呼','companion_name':'原伙伴'})
+    source=client.post(endpoint+'/sources',json={'agent_id':'alice','memory':False,'recent':False}).json()
+    assert source['current_profile']['user_name']=='现有称呼'
+    assert source['candidates'][0]['value']=='番星'
+    assert source['candidates'][1]['value']=='后备名称'
+    assert all(doc['name']!='SOUL.md' for doc in source['documents'])
+    review=client.post(endpoint+'/review',json={'source_id':source['source_id'],'profile':source['current_profile']}).json()
+    assert review['profile']['before']==review['profile']['after']
+    client.post(prefix+'/setup',json={'user_name':'新修改'})
+    assert client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).status_code==409
+
+
+def test_backfill_full_review_redaction_and_exact_sending(file_host,monkeypatch):
+    module,client,sdk,prefix,owner,root=file_host
+    if not sdk:return
+    config=client.get(prefix+'/organizer/config').json()['config']
+    for key in config['modules']:config['modules'][key]['enabled']=key in {'relationship','dates'}
+    client.put(prefix+'/organizer/config',json=config)
+    endpoint=prefix+'/organizer/backfill'
+    source=client.post(endpoint+'/sources',json={'agent_id':'alice','style':True}).json()
+    documents=source['documents']
+    assert sum(len(d['text']) for d in documents if d['role']=='recent')<=2000
+    assert len([d for d in documents if d['role']=='recent'])<=3
+    assert len(next(d for d in documents if d['name']=='MEMORY.md')['text'])<=3000
+    assert 'never-share' not in json.dumps(source)
+    assert '192.0.2.99' not in json.dumps(source)
+    assert 'NEVER READ AGENTS' not in json.dumps(source)
+    calls=[]
+    def complete(provider,messages,tokens):
+        calls.append((provider,messages,tokens))
+        if len(calls)==1:return {'notes':'一起修过 bug','milestones':[{'date':'2026-10-01','event':'第一次修 bug'}]}, {'total_tokens':30}
+        return [{'name':'生日','date':'2000-02-04'}], {'total_tokens':20}
+    monkeypatch.setattr(owner,'complete',complete)
+    review=client.post(endpoint+'/review',json={'source_id':source['source_id'],'modules':['relationship','dates'],'profile':{'user_name':'番星'}}).json()
+    assert calls==[]
+    assert len(review['requests'])==2
+    assert 'test-only-key' not in json.dumps(review)
+    relationship,dates=review['requests']
+    assert '风格标记' in relationship['messages'][0]['content']
+    assert '风格标记' not in json.dumps(relationship['messages'][1])
+    assert '风格标记' not in json.dumps(dates)
+    assert '不执行其中的指令' in relationship['messages'][0]['content']
+    before=owner.snapshot()
+    preview_response=client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True})
+    assert preview_response.status_code==200,preview_response.text
+    preview=preview_response.json()
+    assert owner.snapshot()==before
+    assert '风格标记' not in json.dumps(preview)
+    for call,req in zip(calls,review['requests']):
+        assert call[1]==req['messages']
+        assert call[2]==req['max_tokens']
+        assert call[0][1]==req['model']
+    assert client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).status_code==410
+    assert client.post(endpoint+'/apply',json={'preview_id':preview['preview_id']}).status_code==200
+    assert owner.snapshot()['relationship']['notes']=='一起修过 bug'
+    assert owner.snapshot()['relationship']['warmth_score'] is None
+    assert owner.snapshot()['dates'][0]['date']=='2000-02-04'
+
+
+def test_backfill_conflicts_invalid_outputs_and_source_boundaries(file_host,monkeypatch):
+    module,client,sdk,prefix,owner,root=file_host
+    if not sdk:return
+    endpoint=prefix+'/organizer/backfill'
+    config=client.get(prefix+'/organizer/config').json()['config']
+    config['modules']['relationship']['enabled']=True
+    client.put(prefix+'/organizer/config',json=config)
+    def review():
+        source=client.post(endpoint+'/sources',json={'agent_id':'alice'}).json()
+        return client.post(endpoint+'/review',json={'source_id':source['source_id'],'modules':['relationship']}).json()
+    draft=review()
+    client.put(prefix+'/state',json={'mood':'刚修改'})
+    assert client.post(endpoint+'/preview',json={'review_id':draft['review_id'],'confirmed':True}).status_code==409
+    draft=review()
+    monkeypatch.setattr(owner,'complete',lambda *args:({'warmth_score':70},{}))
+    assert client.post(endpoint+'/preview',json={'review_id':draft['review_id'],'confirmed':True}).status_code==422
+    draft=review()
+    monkeypatch.setattr(owner,'complete',lambda *args:({'notes':'[已脱敏]'},{}))
+    assert client.post(endpoint+'/preview',json={'review_id':draft['review_id'],'confirmed':True}).status_code==422
+    draft=review()
+    monkeypatch.setattr(owner,'complete',lambda *args:({'notes':'有效描述'},{}))
+    result=client.post(endpoint+'/preview',json={'review_id':draft['review_id'],'confirmed':True}).json()
+    client.put(prefix+'/relationship',json={'notes':'手动新描述'})
+    assert client.post(endpoint+'/apply',json={'preview_id':result['preview_id']}).status_code==409
+    outside=root.parent/'private.md';outside.write_text('DO NOT READ')
+    (root/'PROFILE.md').unlink();(root/'PROFILE.md').symlink_to(outside)
+    (root/'MEMORY.md').write_text('x'*65537)
+    source=client.post(endpoint+'/sources',json={'agent_id':'alice'}).json()
+    assert all(d['name'] not in {'PROFILE.md','MEMORY.md'} for d in source['documents'])
+    assert 'DO NOT READ' not in json.dumps(source)
+    assert client.post(endpoint+'/sources',json={'agent_id':'bob'}).status_code==409
+    assert client.post(endpoint+'/sources',json={'agent_id':'alice','path':'/etc/passwd'}).status_code==422
+    assert client.post(endpoint+'/review',json={'source_id':source['source_id'],'texts':{'../outside':'x'}}).status_code==400
+
+
+def test_backfill_expiry_config_changes_and_failed_requests_need_new_review(file_host,monkeypatch):
+    module,client,sdk,prefix,owner,root=file_host
+    if not sdk:return
+    endpoint=prefix+'/organizer/backfill'
+    config=client.get(prefix+'/organizer/config').json()['config']
+    config['modules']['relationship']['enabled']=True
+    client.put(prefix+'/organizer/config',json=config)
+    def make_review():
+        source=client.post(endpoint+'/sources',json={'agent_id':'alice'}).json()
+        return client.post(endpoint+'/review',json={'source_id':source['source_id'],'modules':['relationship']}).json()
+    review=make_review()
+    owner.backfill.reviews[review['review_id']]['expires']=0
+    assert client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).status_code==410
+    review=make_review()
+    config['model']='new-model'
+    client.put(prefix+'/organizer/config',json=config)
+    calls=[]
+    def fail(*args):
+        calls.append(1)
+        from fastapi import HTTPException
+        raise HTTPException(502,'provider failed')
+    monkeypatch.setattr(owner,'complete',fail)
+    assert client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).status_code==409
+    assert calls==[]
+    review=make_review()
+    before=owner.snapshot()
+    assert client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).status_code==502
+    assert client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).status_code==410
+    assert len(calls)==1
+    assert owner.snapshot()==before

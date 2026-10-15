@@ -21,6 +21,15 @@ const server=http.createServer(async(req,res)=>{
    if(req.method==='POST')db.setup={completed:true,profile:payload,has_existing_data:db.setup.has_existing_data};
    res.setHeader('Content-Type','application/json');res.end(JSON.stringify(db.setup));return;
   }
+  if(endpoint.startsWith('organizer/backfill/')){
+   let value;
+   const before={...db.setup.profile};
+   if(endpoint.endsWith('/sources'))value={source_id:'source-local',documents:[{name:'PROFILE.md',role:'profile',text:'user_name: 番星',budget:4000,truncated:false,redacted:false}],candidates:[{field:'user_name',value:'番星',source:'PROFILE.md'},{field:'companion_name',value:'小伴',source:'agent.json'}],current_profile:before,notices:[]};
+   if(endpoint.endsWith('/review')){assert.deepEqual(payload.modules,[]);value={review_id:'review-local',requests:[],profile:{before,after:payload.profile}};}
+   if(endpoint.endsWith('/preview')){assert.equal(payload.confirmed,true);value={preview_id:'preview-local',changes:{profile:{before,after:{user_name:'番星',companion_name:'小伴'}}},requests:0,usage:[]};}
+   if(endpoint.endsWith('/apply')){db.setup.profile={user_name:'番星',companion_name:'小伴'};value={state:'applied',modules:[]};}
+   res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value));return;
+  }
   if(endpoint.startsWith('organizer/')){
    let value;
    if(endpoint==='organizer/config'){
@@ -99,6 +108,26 @@ const server=http.createServer(async(req,res)=>{
   await page.getByRole('button',{name:'保存 AI 设置',exact:true}).click();
   await page.getByText('配置已保存',{exact:true}).waitFor();
   assert.equal(await page.getByLabel('API Key（留空保留已保存密钥） default',{exact:true}).inputValue(),'');
+  const companionBefore=JSON.stringify([db.state,db.schedule,db.notes,db.relationship,db.dates,db.dreams]);
+  const backfill=page.locator('details').filter({has:page.locator('summary').filter({hasText:'从工作区文件回填'})}).first();
+  await backfill.locator('summary').first().click();
+  await backfill.getByRole('button',{name:'推断称呼（仅本地）',exact:true}).click();
+  await backfill.getByLabel('backfill user_name',{exact:true}).waitFor();
+  assert.equal(await backfill.getByLabel('backfill user_name',{exact:true}).inputValue(),'番星');
+  assert.equal(await backfill.getByLabel('backfill companion_name',{exact:true}).inputValue(),'小伴');
+  assert.equal(db.setup.profile.user_name,'');
+  assert.equal(organizerPreviewCalls,0);
+  await backfill.getByRole('button',{name:'生成发送全文（不调用模型）',exact:true}).click();
+  const localPreview=backfill.getByRole('button',{name:'生成本地称呼结果预览',exact:true});
+  await localPreview.waitFor();assert(await localPreview.isDisabled());
+  await backfill.getByRole('checkbox',{name:/我已检查全文与接收地址/}).check();
+  await localPreview.click();
+  await backfill.getByRole('button',{name:'确认写入这些修改',exact:true}).click();
+  await page.getByText('小伴 · 番星',{exact:true}).waitFor();
+  assert.equal(db.setup.profile.user_name,'番星');
+  assert.equal(JSON.stringify([db.state,db.schedule,db.notes,db.relationship,db.dates,db.dreams]),companionBefore);
+  assert.equal(organizerPreviewCalls,0,'local name inference makes no model requests');
+
   await page.getByRole('button',{name:/整理并预览/ }).click();
   await page.getByText('本次只生成预览，尚未写入。预览有效期 10 分钟；期间数据变化会阻止覆盖。',{exact:true}).waitFor();
   assert.equal(organizerPreviewCalls,1);assert.equal(organizerApplyCalls,0);assert.equal(db.state.mood,'平静而充实');
@@ -139,6 +168,6 @@ const server=http.createServer(async(req,res)=>{
   db.agents={supported:false,reason:'宿主未注册 AI 工具',agents:[]};
   await page.getByRole('button',{name:'Refresh status'}).click();
   await page.getByText('宿主未注册 AI 工具',{exact:true}).waitFor();
-  assert.deepEqual(errors,[]);console.log('Browser passed: GitHub and About links, credits, localized About page, overview, schedule edit, note edit/search, 390px layouts, dark theme, English, AI settings save/preview/apply, onboarding and preservation, agent bind/unbind/status and unsupported host; no page errors');
+  assert.deepEqual(errors,[]);console.log('Browser passed: local name inference, review/consent/apply without model calls, GitHub and About links, credits, localized About page, overview, schedule edit, note edit/search, 390px layouts, dark theme, English, AI settings save/preview/apply, onboarding and preservation, agent bind/unbind/status and unsupported host; no page errors');
  }catch(error){console.error('Browser page errors:',errors);await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});throw error;}finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
