@@ -49,10 +49,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.8.1.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.8.2.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.8.1.zip
+qwenpaw plugin install /path/to/companion-core-2.8.2.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -269,7 +269,7 @@ companion-core/
 companion-core/
 ├── plugin.json          # 插件清单（PawApp app 类型）
 ├── plugin.py            # FastAPI + PawApp 后端
-├── requirements.txt     # Python 依赖
+├── requirements-dev.txt     # Python 依赖
 ├── ui/
 │   └── index.js         # 仪表盘前端（React + antd，宿主运行时加载）
 ├── SKILL.md             # 陪伴技能模板（需自定义）
@@ -297,7 +297,7 @@ companion-core/
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt fastapi httpx pytest
+.venv/bin/pip install -r requirements-dev.txt fastapi httpx pytest
 .venv/bin/python -m pytest -q tests
 node tests/frontend.cjs
 python3 scripts/package.py
@@ -317,3 +317,9 @@ python3 scripts/package.py
 - 安装 ZIP 顶层为 `companion-core/`，其中包含描述清单、README、发布说明、更新日志和 MIT 协议；缺少必要文件会直接阻止打包。
 
 后续接续与真机验收：[待办清单](待办清单.md)。
+
+## 运行依赖
+
+插件使用 QwenPaw 宿主已有的 PyYAML（`pyyaml>=6.0`）、FastAPI 和 Pydantic。用户已在 QwenPaw 2.2.2 的安装元数据中确认 PyYAML 为宿主直接依赖。发布包不携带 `requirements.txt`，不触发宿主的插件依赖安装流程；`requirements-dev.txt` 仅供本地开发，不进入安装包。
+
+2.8.2 规避依赖安装分支中的缓存刷新错误，不修复宿主 Python 本身，也不保证其他宿主调用 `importlib.invalidate_caches()` 的路径正常。

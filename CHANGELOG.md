@@ -1,3 +1,9 @@
+# v2.8.2
+
+- 安装包不再包含 requirements.txt，开发依赖改用 requirements-dev.txt；使用 QwenPaw 宿主已有 PyYAML。
+- 规避依赖安装分支的 importlib.invalidate_caches 错误，不修改宿主环境；真实宿主安装待验收。
+- 缺少 PyYAML 时给出明确的宿主依赖提示；增加发布包无依赖安装声明的检查。
+
 # v2.8.1
 
 - 版本锁定 2.8.x，全部功能与真机验收完成后才升级 2.9.0。

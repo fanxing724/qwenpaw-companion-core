@@ -34,7 +34,7 @@ jobs:
               output.write(f'version={version}\n')
           PYTHON
       - name: Install test dependencies
-        run: python3 -m pip install -r requirements.txt fastapi httpx pytest
+        run: python3 -m pip install -r requirements-dev.txt fastapi httpx pytest
       - name: Validate backend and frontend
         run: |
           python3 -m pytest -q tests

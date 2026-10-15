@@ -47,7 +47,13 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import yaml
+try:
+    import yaml
+except ImportError as exc:
+    raise RuntimeError(
+        "companion-core 需要 pyyaml>=6.0（正常安装的 QwenPaw 宿主通常自带）。"
+        "请在宿主使用的 Python 环境中检查并修复 PyYAML 依赖后重试。"
+    ) from exc
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
