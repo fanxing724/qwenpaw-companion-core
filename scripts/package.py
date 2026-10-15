@@ -5,13 +5,19 @@ import sys
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
-version = json.loads((root / 'plugin.json').read_text(encoding='utf-8'))['version']
+manifest = json.loads((root / 'plugin.json').read_text(encoding='utf-8'))
+version = manifest['version']
+required = ['plugin.py', 'plugin.json', 'requirements.txt', 'README.md',
+            'RELEASE.md', 'SKILL.md', 'CHANGELOG.md', 'LICENSE']
+for name in required + list(manifest['entry'].values()):
+    file = root / name
+    if not file.is_file() or not file.stat().st_size:
+        raise SystemExit(f'Missing or empty required file: {name}')
 output = Path(sys.argv[1] if len(sys.argv) > 1 else root / 'dist')
 output.mkdir(parents=True, exist_ok=True)
 archive = output / f'companion-core-{version}.zip'
 with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as bundle:
-    for name in ['plugin.py', 'plugin.json', 'requirements.txt', 'README.md',
-                 'SKILL.md', 'CHANGELOG.md', 'LICENSE', 'data', 'ui']:
+    for name in required + ['data', 'ui']:
         source = root / name
         files = sorted(source.rglob('*')) if source.is_dir() else [source]
         for file in files:

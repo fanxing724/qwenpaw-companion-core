@@ -1,33 +1,73 @@
-name: Release
+name: Package and Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  package:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Get version from tag
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate version
         id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Package zip
         run: |
           python3 - <<'PYTHON'
           import json, os
-          assert json.load(open('plugin.json'))['version'] == os.environ['GITHUB_REF_NAME'].removeprefix('v'), 'Tag and manifest version differ'
+          version = json.load(open('plugin.json', encoding='utf-8'))['version']
+          if os.environ['GITHUB_REF'].startswith('refs/tags/'):
+              assert os.environ['GITHUB_REF_NAME'] == f'v{version}', 'Tag and manifest version differ'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\n')
           PYTHON
-          python3 scripts/package.py .
+      - name: Install test dependencies
+        run: python3 -m pip install -r requirements.txt fastapi httpx pytest
+      - name: Validate backend and frontend
+        run: |
+          python3 -m pytest -q tests
+          node --check ui/index.js
+          node tests/frontend.cjs
+      - name: Package plugin
+        run: python3 scripts/package.py dist
+      - name: Upload installable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-core-${{ steps.version.outputs.version }}
+          path: dist/companion-core-${{ steps.version.outputs.version }}.zip
+          if-no-files-found: error
 
-      - name: Create Release
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: companion-core-${{ needs.package.outputs.version }}
+          path: dist
+      - name: Publish release with description and license
         uses: softprops/action-gh-release@v2
         with:
-          files: "companion-core-${{ steps.version.outputs.VERSION }}.zip"
-          generate_release_notes: true
+          name: 陪伴核心 v${{ needs.package.outputs.version }}
+          body_path: RELEASE.md
+          files: |
+            dist/companion-core-${{ needs.package.outputs.version }}.zip
+            README.md
+            LICENSE
+          fail_on_unmatched_files: true

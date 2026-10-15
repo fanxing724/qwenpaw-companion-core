@@ -1,5 +1,10 @@
 # 💞 陪伴核心系统（Companion Core）
 
+[![自动打包](https://github.com/fanxing724/qwenpaw-companion-core/actions/workflows/release.yml/badge.svg)](https://github.com/fanxing724/qwenpaw-companion-core/actions/workflows/release.yml)
+[![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+[下载正式安装包](https://github.com/fanxing724/qwenpaw-companion-core/releases/latest) · [发布说明](RELEASE.md) · [开源协议](LICENSE)
+
 基于 QwenPaw 2.x 插件接口开发的一体化陪伴系统，为 QwenPaw Agent 提供状态管理、梦境记录、日程安排、便签提醒、关系记录和重要日期管理，并附带可视化仪表盘。
 
 ## 🙏 致谢
@@ -190,7 +195,7 @@ companion-core/
 
 ## 📄 许可证
 
-MIT
+本项目采用 [MIT License](LICENSE)，完整协议保存在仓库根目录，并随每个插件安装包分发。
 
 ## 开发验证
 
@@ -207,3 +212,10 @@ python3 scripts/package.py
 自动测试使用临时数据目录验证 FastAPI 接口、保存和备份恢复，并模拟前端宿主检查 API 地址与菜单注册。SDK 注册检查使用测试替身，不代表已在真实 QwenPaw 验证。发布前仍需在目标宿主检查安装、页面加载及 Agent 工具可用性。
 
 恢复备份时先校验所有已知数据段，格式有误时拒绝写入；备份中提供的数据段覆盖对应记录，梦境按日期合并，不删除备份外的梦境。磁盘故障时仍不保证跨文件事务。2 月 29 日纪念日倒计时按下一次有效闰日计算。
+
+## 自动打包与发布
+
+- 推送 `main` 或手动运行 **Package and Release**：验证后生成 ZIP，可在对应 Actions 运行的 Artifacts 中下载。
+- 推送 `v<版本号>` 标签：核对标签与 `plugin.json` 版本，验证并打包，自动发布 GitHub Release。
+- Release 页面展示 `RELEASE.md`，并提供安装包、`README.md` 和 `LICENSE` 下载。
+- 安装 ZIP 顶层为 `companion-core/`，其中包含描述清单、README、发布说明、更新日志和 MIT 协议；缺少必要文件会直接阻止打包。

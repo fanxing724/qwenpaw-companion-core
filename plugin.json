@@ -2,10 +2,10 @@
   "id": "companion-core",
   "name": "陪伴核心",
   "version": "2.4.0",
-  "description": "Integrated companion system — state tracking, dreams, schedule, notes, relationship and important dates, with a dashboard UI and REST API for agents.",
+  "description": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期，支持搜索编辑、备份恢复和 REST API。",
   "description_i18n": {
-    "zh-CN": "一体化陪伴系统 — 状态管理、梦境、日程、便签、关系记录与重要日期，提供可视化仪表盘和供 Agent 调用的 REST API。",
-    "en-US": "Integrated companion system — state tracking, dreams, schedule, notes, relationship and important dates, with a dashboard UI and REST API for agents."
+    "zh-CN": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期，支持搜索编辑、备份恢复和 REST API。",
+    "en-US": "Companion dashboard with daily overview, state, schedules, dreams, notes, relationships, important dates, search, editing, backup and REST API."
   },
   "author": "QwenPaw Community",
   "license": "MIT",
