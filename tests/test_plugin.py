@@ -441,3 +441,41 @@ def test_organizer_six_modules_validate_before_any_write(organizer_host, monkeyp
     assert after['dreams'][0]['content']=='梦见了森林'
     assert any(note['content']=='记得喝水' for note in after['notes'])
     assert any(item['name']=='纪念日' for item in after['dates'])
+
+
+def test_fresh_install_is_empty_and_setup_can_be_completed(loaded):
+    module, client, data, sdk = loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    setup=client.get(prefix+'/setup').json()
+    assert setup=={'completed':False,'profile':{'user_name':'','companion_name':''},'has_existing_data':False}
+    state=client.get(prefix+'/state').json()
+    assert state['energy'] is None
+    assert all(not state[field] for field in ['sleep','health','hunger','mood','dream','note','date'])
+    assert client.get(prefix+'/schedule').json()['plan']==[]
+    relationship=client.get(prefix+'/relationship').json()
+    assert relationship['warmth_score'] is None and relationship['notes']==''
+    assert client.post(prefix+'/relationship/decay').json()['warmth_score'] is None
+    completed=client.post(prefix+'/setup',json={'user_name':' 小星 ','companion_name':' 小伴 '})
+    assert completed.status_code==200,completed.text
+    assert completed.json()['completed'] is True
+    assert completed.json()['profile']=={'user_name':'小星','companion_name':'小伴'}
+    assert client.get(prefix+'/state').json()==state
+    assert (data/'setup.json').stat().st_mode & 0o777==0o600
+    module._seed_data()
+    assert client.get(prefix+'/setup').json()['completed'] is True
+
+
+def test_setup_preserves_existing_and_custom_seed_data(loaded):
+    module, client, _, sdk = loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    client.put(prefix+'/state',json={'mood':'我的真实心情','energy':65})
+    client.post(prefix+'/notes',json={'content':'用户自己的便签'})
+    before=module.export_all_data();before.pop('exported_at')
+    assert client.get(prefix+'/setup').json()['has_existing_data'] is True
+    assert client.post(prefix+'/setup',json={}).status_code==200
+    after=module.export_all_data();after.pop('exported_at')
+    assert after==before
+    module._seed_data()
+    after=module.export_all_data();after.pop('exported_at')
+    assert after==before
+    assert client.post(prefix+'/setup',json={'user_name':'x'*81}).status_code==422

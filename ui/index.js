@@ -44,11 +44,12 @@
 
   var MESSAGES = {
     zh: {
-      tabOrganizer:"聊天整理", orgIntro:"使用独立的小模型整理近期聊天，不占用主聊天模型。近期文字会发送至你配置的 API。每个启用模块最多调用一次，六个模块最多六次；实际费用按服务商计费。",
+      setupTitle:"开始你的陪伴记录", setupOpen:"使用引导", setupStep:"第 {step} 步，共 3 步", setupNames:"认识彼此", setupNamesHint:"称呼可以留空。记录从真实的聊天和生活开始。", setupUser:"你的称呼", setupCompanion:"陪伴对象的称呼", setupExisting:"已检测到已有记录。本引导只保存设置，会保留现有数据。", setupClean:"从空白记录开始：不预填心情、作息或关系分数。", setupAgent:"连接智能体", setupAgentHint:"选择一个智能体并启用陪伴工具，也可以稍后在“智能体绑定”中操作。", setupChoose:"暂不绑定", setupBindNext:"绑定并继续", setupModel:"配置 AI 模型", setupModelHint:"可填写一个便宜小模型，供各模块共用。也可跳过，之后在“AI 设置”中配置。保存本身不会调用模型，自动整理保持原来的开关状态。", setupNext:"下一步", setupBack:"上一步", setupLater:"稍后设置", setupFinish:"完成设置", setupMissingModel:"请同时填写 API 地址和模型名称，或选择稍后设置。", orgUseShared:"公共模型", noScore:"尚未记录",
+      tabOrganizer:"AI 设置", orgIntro:"使用独立的小模型整理近期聊天，不占用主聊天模型。近期文字会发送至你配置的 API。每个启用模块最多调用一次，六个模块最多六次；实际费用按服务商计费。",
       orgBase:"API 基址（例如 https://example.com/v1）", orgModel:"模型名称", orgKey:"API Key（留空保留已保存密钥）", orgKeySaved:"已保存密钥", orgKeyEmpty:"未设置密钥（支持免密本地接口）", orgKeyClear:"清除已保存密钥", orgInherit:"留空继承公共设置；不同 API 地址不继承公共密钥",
       orgAgent:"整理目标智能体", orgChooseAgent:"选择已绑定的智能体", orgChat:"近期会话", orgChooseChat:"选择一个会话", orgAuto:"聊天结束自动整理", orgAutoHint:"自动整理默认关闭。开启后仅处理目标智能体，在聊天结束后按最小间隔运行，无新内容则跳过；会自动写入数据并保留最近 10 份轮换备份。",
       orgNoAuto:"此宿主不支持自动整理钩子，可手动整理。", orgInterval:"最小间隔（分钟）", orgMessages:"最多读取消息数", orgChars:"聊天文字上限（字符）", orgTokens:"每个模块最大输出 token", orgEnabled:"启用此模块", orgPrompt:"模块整理规则 / 提示词", orgSchema:"数据定义（固定结构，点击查看）",
-      orgSave:"保存整理配置", orgRefresh:"刷新配置与状态", orgSaved:"配置已保存", orgPreview:"整理并预览（会消耗模型额度）", orgApply:"确认写入这些修改", orgDiscard:"放弃预览", orgNoChanges:"模型未提出数据修改。", orgPreviewHint:"本次只生成预览，尚未写入。预览有效期 10 分钟；期间数据变化会阻止覆盖。",
+      orgSave:"保存 AI 设置", orgRefresh:"刷新配置与状态", orgSaved:"配置已保存", orgPreview:"整理并预览（会消耗模型额度）", orgApply:"确认写入这些修改", orgDiscard:"放弃预览", orgNoChanges:"模型未提出数据修改。", orgPreviewHint:"本次只生成预览，尚未写入。预览有效期 10 分钟；期间数据变化会阻止覆盖。",
       orgApplied:"修改已写入，其他模块页面已刷新。", orgBefore:"修改前", orgAfter:"修改后", orgUsage:"本次模型用量（服务商未返回时显示空对象）", orgStatus:"最近整理状态", orgDirty:"有未保存设置，请先保存再整理。", orgRead:"读取消息", orgRequests:"模型请求数", orgLoadingChats:"未选择会话或该智能体暂无可读取会话。", orgShared:"六个模块分别使用自己的提示词和模型；API、模型留空时使用公共设置。各智能体仍共享陪伴数据。",
       tabAgents: "智能体绑定", agentsHint: "绑定会在宿主配置中启用该智能体的 7 个陪伴工具。数据仍由本插件共享；绑定不代表模型已经调用。",
       agentBind: "绑定并启用工具", agentUnbind: "解除绑定", agentBound: "已绑定", agentPartial: "部分启用", agentUnbound: "未绑定", agentUnknown: "配置读取失败",
@@ -105,11 +106,12 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
-      tabOrganizer:"Chat organizer", orgIntro:"Use an independent small model to organize recent chats. Recent text is sent to your configured API. Each enabled module makes at most one request, up to six per run. Provider pricing applies.",
+      setupTitle:"Start your companion journal", setupOpen:"Getting started", setupStep:"Step {step} of 3", setupNames:"Get acquainted", setupNamesHint:"Names are optional. Start with real conversations and experiences.", setupUser:"Your name", setupCompanion:"Companion name", setupExisting:"Existing records found. This guide saves settings and preserves your data.", setupClean:"Start with empty records: no preset moods, routines or relationship scores.", setupAgent:"Connect an agent", setupAgentHint:"Enable companion tools for an agent, or do this later in Agent binding.", setupChoose:"Bind later", setupBindNext:"Bind and continue", setupModel:"Configure an AI model", setupModelHint:"Optionally share one inexpensive model across modules. You can configure it later in AI settings. Saving makes no model requests and preserves the existing automatic-update switch.", setupNext:"Next", setupBack:"Back", setupLater:"Set up later", setupFinish:"Finish setup", setupMissingModel:"Enter both API URL and model name, or choose Set up later.", orgUseShared:"Shared model", noScore:"Not recorded",
+      tabOrganizer:"AI settings", orgIntro:"Use an independent small model to organize recent chats. Recent text is sent to your configured API. Each enabled module makes at most one request, up to six per run. Provider pricing applies.",
       orgBase:"API base URL (e.g. https://example.com/v1)", orgModel:"Model name", orgKey:"API key (blank keeps the saved key)", orgKeySaved:"Key saved", orgKeyEmpty:"No key (local keyless endpoints supported)", orgKeyClear:"Clear saved key", orgInherit:"Blank inherits shared settings. A different endpoint does not inherit the shared key.",
       orgAgent:"Target agent", orgChooseAgent:"Choose a bound agent", orgChat:"Recent conversation", orgChooseChat:"Choose a conversation", orgAuto:"Organize after chats automatically", orgAutoHint:"Off by default. Runs after the selected agent finishes a chat, subject to the minimum interval; unchanged text is skipped. Changes are applied automatically, retaining 10 rotating backups.",
       orgNoAuto:"This host has no automatic hook; manual organization is available.", orgInterval:"Minimum interval (minutes)", orgMessages:"Maximum recent messages", orgChars:"Maximum chat characters", orgTokens:"Maximum output tokens per module", orgEnabled:"Enable module", orgPrompt:"Module rules / prompt", orgSchema:"Data schema (fixed structure)",
-      orgSave:"Save organizer settings", orgRefresh:"Refresh settings and status", orgSaved:"Settings saved", orgPreview:"Generate preview (uses model credits)", orgApply:"Apply these changes", orgDiscard:"Discard preview", orgNoChanges:"The model proposed no changes.", orgPreviewHint:"Preview only; nothing written yet. Expires in 10 minutes. Concurrent edits block overwriting.",
+      orgSave:"Save AI settings", orgRefresh:"Refresh settings and status", orgSaved:"Settings saved", orgPreview:"Generate preview (uses model credits)", orgApply:"Apply these changes", orgDiscard:"Discard preview", orgNoChanges:"The model proposed no changes.", orgPreviewHint:"Preview only; nothing written yet. Expires in 10 minutes. Concurrent edits block overwriting.",
       orgApplied:"Changes applied. Other module pages refreshed.", orgBefore:"Before", orgAfter:"After", orgUsage:"Model usage (empty if the provider omitted it)", orgStatus:"Latest organizer status", orgDirty:"Unsaved settings. Save before organizing.", orgRead:"Messages read", orgRequests:"Model requests", orgLoadingChats:"No conversation selected or no readable conversations.", orgShared:"Each module has its own prompt and optional model/API overrides. Blank settings inherit the shared defaults. Companion data is shared across agents.",
       tabAgents: "Agent binding", agentsHint: "Binding enables the seven companion tools in the host agent configuration. Companion data remains shared; binding does not prove model usage.",
       agentBind: "Bind and enable tools", agentUnbind: "Unbind", agentBound: "Bound", agentPartial: "Partially enabled", agentUnbound: "Unbound", agentUnknown: "Cannot read configuration",
@@ -331,6 +333,8 @@
     deleteDate: function (n) { return apiFetch("/companion-core/dates/" + encodeURIComponent(n), { method: "DELETE" }); },
     exportAll: function () { return apiFetch("/companion-core/export"); },
     importAll: function (d) { return apiFetch("/companion-core/import", { method: "POST", body: d }); },
+    setup: function () { return apiFetch("/companion-core/setup"); },
+    completeSetup: function (data) { return apiFetch("/companion-core/setup",{method:"POST",body:data}); },
     organizerConfig: function () { return apiFetch("/companion-core/organizer/config"); },
     saveOrganizer: function (data) { return apiFetch("/companion-core/organizer/config", {method:"PUT",body:data}); },
     organizerChats: function (id) { return apiFetch("/companion-core/organizer/chats?agent_id=" + encodeURIComponent(id)); },
@@ -400,9 +404,9 @@
       h(Toolbar, {left: h(SectionIntro, {C:C}, t("overviewHint")), right: h(Button, {onClick:s.retry}, t("refresh"))}),
       h("div", {className: "cc-metrics"},
         metric(t("summaryMood"), state.mood || "—", state.date || t("summaryEmpty"), "state", "☀"),
-        metric(t("summaryEnergy"), String(state.energy || 0) + "%", state.sleep || "—", "state", "↗"),
+        metric(t("summaryEnergy"), typeof state.energy === "number" ? state.energy + "%" : "—", state.sleep || "—", "state", "↗"),
         metric(t("pendingNotes"), notes.length, t("notesHint"), "notes", "✎"),
-        metric(t("summaryWarmth"), String(s.data[4].warmth_score || 0) + "%", t("tabRelationship"), "relationship", "♡")),
+        metric(t("summaryWarmth"), typeof s.data[4].warmth_score === "number" ? s.data[4].warmth_score + "%" : "—", t("tabRelationship"), "relationship", "♡")),
       h("div", {className: "cc-overview-grid"},
         card(t("nextPlan"), "schedule", plans.length ? plans.slice(0,5).map(function(item,i) {
           return h("div", {className:"cc-timeline-row", key:i}, h("time", null,item.time), h("span", null,item.activity));
@@ -429,9 +433,6 @@
     if (s.loading) return h(LoadingBlock, { t: t, C: C });
     if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
     var data = s.data || {};
-    if (!data.date && !data.mood) {
-      return h("div", { style: { padding: 32, textAlign: "center" } }, h(Empty, { description: t("noState") }));
-    }
 
     var energy = typeof data.energy === "number" ? data.energy : 0;
 
@@ -463,7 +464,7 @@
           h(Field, { label: t("fHunger"), C: C }, data.hunger || "—")),
         h("div", { style: panelStyle(C) },
           h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 4 } }, t("fEnergy")),
-          h(Progress, { percent: energy, strokeColor: C.accent }),
+          typeof data.energy === "number" ? h(Progress, { percent: energy, strokeColor: C.accent }) : h("p",{style:{color:C.sub}},t("noScore")),
           h(Field, { label: t("fDream"), C: C }, data.dream || "—"),
           h(Field, { label: t("fNote"), C: C }, data.note || "—"))),
       h(Modal, {
@@ -775,7 +776,7 @@
       h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 } },
         h("div", { style: panelStyle(C) },
           h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 4 } }, t("warmth")),
-          h(Progress, { percent: warmth, strokeColor: C.accent }),
+          typeof data.warmth_score === "number" ? h(Progress, { percent: warmth, strokeColor: C.accent }) : h("p",{style:{color:C.sub}},t("noScore")),
           h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", margin: "12px 0 4px" } },
             h("span", { style: { color: C.sub, fontSize: 13 } }, t("relNotes")),
             editing
@@ -887,6 +888,56 @@
 
   // ── Tab: Data (export / import) ──────────────────────────────────────
 
+  function SetupWizard(props) {
+    var t=props.t,C=props.C,profile=(props.setup && props.setup.profile)||{};
+    var st=useState(0),step=st[0],setStep=st[1];
+    var names=useState({user_name:profile.user_name||"",companion_name:profile.companion_name||""}),name=names[0],setName=names[1];
+    var as=useState(""),agent=as[0],setAgent=as[1];
+    var fs=useState(null),config=fs[0],setConfig=fs[1];
+    var bs=useState(false),busy=bs[0],setBusy=bs[1];
+    var es=useState(""),error=es[0],setError=es[1];
+    var s=useAsync(function(){return Promise.all([api.agents().catch(function(e){return {agents:[],reason:e.message};}),api.organizerConfig()]);},[]);
+    useEffect(function(){if(s.data){setConfig(s.data[1].config);setAgent(s.data[1].config.agent_id||"");}},[s.data]);
+    function act(fn){if(busy)return;setBusy(true);setError("");fn().catch(function(e){setError(e.message);}).then(function(){setBusy(false);});}
+    function complete(later){act(function(){
+      var save=Promise.resolve();
+      if(!later && config){
+        if((config.base_url || config.model || config.api_key) && (!config.base_url || !config.model))return Promise.reject(new Error(t("setupMissingModel")));
+        save=api.saveOrganizer(Object.assign({},config,{agent_id:agent||config.agent_id}));
+      }
+      return save.then(function(){return api.completeSetup(name);}).then(props.onDone);
+    });}
+    function next(){
+      if(step===0){setStep(1);return;}
+      if(!agent){setStep(2);return;}
+      act(function(){return api.bindAgent(agent,true).then(function(){setStep(2);});});
+    }
+    function input(label,value,onChange,password){return h("div",{style:{marginBottom:18}},h(EditorRow,{label:label,C:C},h(Input,{"aria-label":label,type:password?"password":"text",autoComplete:password?"new-password":"off",maxLength:password?4000:200,value:value,disabled:busy,onChange:function(e){onChange(e.target.value);}})));}
+    function setting(key,value){setConfig(Object.assign({},config,(function(){var update={};update[key]=value;return update;})()));}
+    var agents=s.data?(s.data[0].agents||[]):[];
+    return h(Modal,{open:true,title:t("setupTitle"),footer:null,closable:false,maskClosable:false,width:640},
+      h("p",{style:{color:C.sub}},t("setupStep",{step:step+1})),
+      h("p",{style:{color:C.sub,lineHeight:1.7}},t(props.setup && props.setup.has_existing_data?"setupExisting":"setupClean")),
+      error?h("p",{role:"alert",style:{color:C.accent}},error):null,
+      step===0?h("div",{},h("h3",null,t("setupNames")),h("p",null,t("setupNamesHint")),
+        input(t("setupUser"),name.user_name,function(v){setName(Object.assign({},name,{user_name:v}));}),
+        input(t("setupCompanion"),name.companion_name,function(v){setName(Object.assign({},name,{companion_name:v}));})):null,
+      step===1?h("div",{},h("h3",null,t("setupAgent")),h("p",null,t("setupAgentHint")),
+        s.loading?h(LoadingBlock,{t:t,C:C}):s.error?h(ErrorBlock,{t:t,C:C,error:s.error,onRetry:s.retry}):
+          h("select",{"aria-label":t("setupAgent"),value:agent,disabled:busy,style:{width:"100%",padding:10,borderRadius:8,background:C.cardBg,color:C.text},onChange:function(e){setAgent(e.target.value);}},
+            h("option",{value:""},t("setupChoose")),agents.filter(function(a){return a.agent_enabled!==false && !a.error;}).map(function(a){return h("option",{key:a.id,value:a.id},a.name+" ("+a.id+")");})),
+        s.data && s.data[0].reason?h("p",null,s.data[0].reason):null):null,
+      step===2?h("div",{},h("h3",null,t("setupModel")),h("p",{style:{lineHeight:1.7}},t("setupModelHint")),
+        config?h("div",{},input(t("orgBase"),config.base_url,function(v){setting("base_url",v);}),input(t("orgModel"),config.model,function(v){setting("model",v);}),
+          input(t("orgKey"),config.api_key,function(v){setting("api_key",v);},true),config.api_key_configured?h("p",null,t("orgKeySaved")):null):
+          s.error?h(ErrorBlock,{t:t,C:C,error:s.error,onRetry:s.retry}):h(LoadingBlock,{t:t,C:C})):null,
+      h("div",{style:{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"flex-end",marginTop:24}},
+        h(Button,{disabled:busy,onClick:function(){complete(true);}},t("setupLater")),
+        step>0?h(Button,{disabled:busy,onClick:function(){setError("");setStep(step-1);}},t("setupBack")):null,
+        step<2?h(Button,{type:"primary",loading:busy,disabled:busy,onClick:next},t(step===1 && agent?"setupBindNext":"setupNext")):
+          h(Button,{type:"primary",loading:busy,disabled:busy||!config,onClick:function(){complete(false);}},t("setupFinish"))));
+  }
+
   function OrganizerTab(props) {
     var t=props.t, C=props.C;
     var s=useAsync(function(){return Promise.all([api.organizerConfig(),api.agents()]);},[]);
@@ -943,7 +994,7 @@
       number("orgInterval","interval_minutes",5,1440),
       h("p",{style:{color:C.sub}},t("orgShared")),
       Object.keys(labels).map(function(key){var module=form.modules[key];return h("details",{key:key,style:{border:C.border,padding:16,borderRadius:12,marginBottom:12}},
-        h("summary",{style:{cursor:"pointer",fontWeight:600}},t(labels[key])+" · "+(module.model || form.model || "—")),
+        h("summary",{style:{cursor:"pointer",fontWeight:600}},t(labels[key])+" · "+(module.model || t("orgUseShared"))),
         h("div",{style:{paddingTop:16}},field(t("orgEnabled"),h(Switch,{checked:module.enabled,disabled:busy,onChange:function(v){update("enabled",v,key);}})),
           h("p",{style:{color:C.sub}},t("orgInherit")),provider(module,key),
           field(t("orgPrompt"),h(TextArea,{rows:4,value:module.prompt,disabled:busy,onChange:function(e){update("prompt",e.target.value,key);}})),
@@ -1120,9 +1171,13 @@
   function CompanionApp() {
     var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
     var _rev = useState(0), revision = _rev[0], setRevision = _rev[1];
+    var setupState=useState(null),setupData=setupState[0],setSetupData=setupState[1];
+    var setupOpenState=useState(false),setupOpen=setupOpenState[0],setSetupOpen=setupOpenState[1];
     var versionState = useState(APP_VERSION), version = versionState[0], setVersion = versionState[1];
     useEffect(function () {
       var active = true;
+      api.setup().then(function(data){if(active){setSetupData(data);setSetupOpen(!data.completed);}})
+        .catch(function(error){console.warn("[companion-core] setup failed",error);});
       api.health().then(function (data) {
         APP_VERSION = data.version || "";
         if (active) setVersion(APP_VERSION);
@@ -1138,11 +1193,12 @@
 
     return h("div", {className:"cc-app", "data-theme":isDark ? "dark" : "light", style:{"--cc-text":C.text,"--cc-sub":C.sub,"--cc-card":C.cardBg,"--cc-bg":C.pageBg,"--cc-accent":C.accent}},
       h("style",null,APP_CSS),
+      setupOpen?h(SetupWizard,{t:t,C:C,setup:setupData,onDone:function(data){setSetupData(data);setSetupOpen(false);setRevision(function(v){return v+1;});}}):null,
       h("header",{className:"cc-hero"},
         h("div",{className:"cc-hero-copy"}, h("div",{className:"cc-eyebrow"},"♡  " + t("todayLabel")),
           h("h1",null,t("appTitle"),h("span",{className:"cc-version"},version ? "v"+version : "")),
-          h("p",null,t("welcome"))),
-        h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")))),
+          h("p",null,setupData && setupData.profile && (setupData.profile.user_name || setupData.profile.companion_name)?[setupData.profile.companion_name,setupData.profile.user_name].filter(Boolean).join(" · "):t("welcome"))),
+        h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")),h(Button,{size:"small",style:{marginTop:12},onClick:function(){setSetupOpen(true);}},t("setupOpen")))),
       h(Tabs, {
         className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
         destroyInactiveTabPane:true,

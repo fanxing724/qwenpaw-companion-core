@@ -32,10 +32,11 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   const base = mode === 'base-path' ? '/paw/api' : '/api';
   const mount = mode === 'legacy-router' ? '/plugins' : '';
   assert.equal(requests[0], base + '/companion-core/health', mode);
-  assert.equal(requests[1], base + mount + '/companion-core/health', mode);
+  assert.equal(requests[1], base + mount + '/companion-core/setup', mode);
+  assert.equal(requests[2], base + mount + '/companion-core/health', mode);
   await context.window.testApi('/companion-core/state', {method:'PUT', body:{energy:50}});
   assert.equal(requests.at(-1), base + mount + '/companion-core/state', mode);
-  assert.equal(requests.length, 3, 'one discovery probe and no mutation retries');
+  assert.equal(requests.length, 4, 'one discovery probe and no mutation retries');
 }
 console.log('Frontend: 7 host modes, routes, ten tabs and health API passed');
 

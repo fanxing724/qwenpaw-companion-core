@@ -106,12 +106,12 @@ def _validate_date(value: str) -> str:
 
 class StateModel(BaseModel):
     date: str = ""
-    sleep: str = "昨晚睡得超香"
-    dream: str = "不记得做什么梦啦"
-    health: str = "身体状态超棒"
-    hunger: str = "不饿也不撑刚刚好"
-    mood: str = "心情超平和～"
-    energy: int = Field(default=70, ge=0, le=100)
+    sleep: str = ""
+    dream: str = ""
+    health: str = ""
+    hunger: str = ""
+    mood: str = ""
+    energy: int | None = Field(default=None, ge=0, le=100)
     note: str = ""
 
     _valid_date = field_validator("date")(_validate_date)
@@ -156,7 +156,7 @@ class NoteModel(BaseModel):
 
 class RelationshipModel(BaseModel):
     last_updated: str = ""
-    warmth_score: int = Field(default=50, ge=10, le=100)
+    warmth_score: int | None = Field(default=None, ge=10, le=100)
     milestones: list[dict] = []
     notes: str = ""
 
@@ -646,19 +646,21 @@ def apply_relationship_decay():
 
         last_updated = data.get("last_updated", "")
         if not last_updated:
-            return {"decayed": 0, "warmth_score": data.get("warmth_score", 50)}
+            return {"decayed": 0, "warmth_score": data.get("warmth_score")}
 
         try:
             last_date = datetime.strptime(last_updated[:10], "%Y-%m-%d").date()
             today = date.today()
             days_since = (today - last_date).days
         except Exception:
-            return {"decayed": 0, "warmth_score": data.get("warmth_score", 50)}
+            return {"decayed": 0, "warmth_score": data.get("warmth_score")}
 
         if days_since <= 0:
-            return {"decayed": 0, "warmth_score": data.get("warmth_score", 50)}
+            return {"decayed": 0, "warmth_score": data.get("warmth_score")}
 
-        current_score = data.get("warmth_score", 50)
+        current_score = data.get("warmth_score")
+        if current_score is None:
+            return {"decayed": 0, "warmth_score": None}
         decay = min(days_since, current_score - 10)
         if decay > 0:
             data["warmth_score"] = max(10, current_score - decay)
@@ -839,7 +841,7 @@ async def companion_get_state():
     text = (
         f"当前状态（{data.get('date', '未知日期')}）：\n"
         f"- 心情：{data.get('mood', '未知')}\n"
-        f"- 精力：{data.get('energy', 0)}/100\n"
+        f"- 精力：{str(data['energy']) + '/100' if data.get('energy') is not None else '未记录'}\n"
         f"- 睡眠：{data.get('sleep', '未知')}\n"
         f"- 健康：{data.get('health', '未知')}\n"
         f"- 梦境：{data.get('dream', '无')}"
@@ -888,7 +890,7 @@ async def companion_get_relationship():
     milestones = data.get("milestones", [])
     text = (
         f"关系记录：\n"
-        f"- 亲密度：{data.get('warmth_score', 50)}/100\n"
+        f"- 亲密度：{str(data['warmth_score']) + '/100' if data.get('warmth_score') is not None else '未记录'}\n"
         f"- 最后更新：{data.get('last_updated', '未知')}\n"
         f"- 里程碑：{len(milestones)} 个"
     )
@@ -1113,6 +1115,42 @@ _organizer_spec.loader.exec_module(_organizer_module)
 organizer = _organizer_module.install(router, globals())
 if app is not None:
     app.hook("shutdown")(organizer.shutdown)
+
+class SetupProfile(BaseModel):
+    user_name: str = Field(default="", max_length=80)
+    companion_name: str = Field(default="", max_length=80)
+
+    @field_validator("user_name", "companion_name")
+    @classmethod
+    def clean_name(cls, value):
+        return value.strip()
+
+
+@router.get("/setup")
+def get_setup():
+    data = organizer.read_json(_DATA_DIR / "setup.json", {})
+    snapshot = export_all_data()
+    state = snapshot["state"]
+    relationship = snapshot["relationship"]
+    has_data = bool(snapshot["schedule"].get("plan") or snapshot["notes"] or snapshot["dreams"]
+                    or snapshot["dates"].get("dates") or relationship.get("milestones")
+                    or relationship.get("notes") or relationship.get("warmth_score") is not None
+                    or any(state.get(key) for key in ("mood", "sleep", "health", "hunger", "dream", "note", "date"))
+                    or state.get("energy") is not None)
+    return {"completed": data.get("completed") is True,
+            "profile": SetupProfile.model_validate(data.get("profile", {})).model_dump(),
+            "has_existing_data": has_data}
+
+
+@router.post("/setup")
+def complete_setup(payload: SetupProfile):
+    # Finishing or deferring setup only stores preferences. Never reset records.
+    with _lock:
+        organizer.private_write(_DATA_DIR / "setup.json", {
+            "completed": True, "profile": payload.model_dump(), "completed_at": _now_ts(),
+        })
+    return get_setup()
+
 
 # Standard router loaders do not invoke PawApp lifecycle hooks, even
 # when the optional SDK is installed. Initialize only missing files.
