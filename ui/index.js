@@ -1,12 +1,12 @@
 /**
- * Companion Core v2.3.1 — frontend dashboard.
+ * Companion Core — frontend dashboard.
  *
  * 7 tabs: State, Schedule, Dreams, Notes, Relationship, Dates, Data.
  * Dark mode via host.useTheme(); API calls go through host.getApiUrl().
  */
 (function () {
   var QwenPaw = window.QwenPaw;
-  if (!QwenPaw || !QwenPaw.host || !QwenPaw.registerRoutes) {
+  if (!QwenPaw || !QwenPaw.host) {
     console.error("[companion-core] window.QwenPaw not ready");
     return;
   }
@@ -14,6 +14,10 @@
   var host = QwenPaw.host;
   var React = host.React;
   var antd = host.antd;
+  if (!React || !antd) {
+    console.error("[companion-core] Host React and antd are required");
+    return;
+  }
   var h = React.createElement;
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -40,6 +44,17 @@
 
   var MESSAGES = {
     zh: {
+      tabOverview: "今日总览", overviewHint: "把今天的状态、安排和牵挂放在一起。",
+      pendingNotes: "待提醒便签", upcoming: "即将到来", nextPlan: "今天的安排",
+      quickActions: "快速前往", welcome: "每一天，都值得好好记录", todayLabel: "今日陪伴",
+      search: "搜索记录…", noResults: "没有匹配的记录", allNotes: "全部", pendingOnly: "待提醒",
+      editNote: "编辑便签", editSchedule: "编辑日程", timeInvalid: "请输入有效时间 HH:MM",
+      scheduleHint: "日程按时间排列，可随时调整。", notesHint: "记下小事，也留住重要的叮嘱。",
+      dreamsHint: "记录醒来前的片刻，留住梦里的世界。", datesHint: "让每个重要的日子都被记得。",
+      staleSchedule: "这份安排来自 {date}，请留意日期。", records: "{count} 条记录",
+      summaryMood: "此刻心情", summaryEnergy: "今日精力", summaryWarmth: "关系温度",
+      openSection: "打开", summaryEmpty: "慢慢来，从一条记录开始。", viewAll: "查看全部",
+
       appTitle: "陪伴核心", appSubtitle: "状态 · 日程 · 梦境 · 便签 · 关系 · 重要日期 · 数据",
       tabState: "状态", tabSchedule: "日程", tabDreams: "梦境",
       tabNotes: "便签", tabRelationship: "关系", tabDates: "重要日期", tabData: "数据",
@@ -69,7 +84,7 @@
       confirmDeleteDate: "确定删除「{name}」吗？",
       exportData: "导出数据", importData: "导入数据",
       exportDesc: "下载所有陪伴数据的 JSON 备份文件。",
-      importDesc: "从 JSON 备份文件恢复数据（将覆盖现有数据）。",
+      importDesc: "恢复备份中包含的数据；梦境按日期合并。",
       importSuccess: "数据导入成功，已恢复: {fields}",
       exportSuccess: "数据已导出", importFailed: "导入失败: {error}",
       timeRequired: "请填写时间", activityRequired: "请填写活动",
@@ -79,6 +94,17 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
+      tabOverview: "Overview", overviewHint: "Your mood, plans and reminders, together.",
+      pendingNotes: "Pending reminders", upcoming: "Coming up", nextPlan: "Today's plans",
+      quickActions: "Quick access", welcome: "A little care, every day", todayLabel: "DAILY COMPANION",
+      search: "Search records…", noResults: "No matching records", allNotes: "All", pendingOnly: "Pending",
+      editNote: "Edit note", editSchedule: "Edit schedule", timeInvalid: "Enter a valid time HH:MM",
+      scheduleHint: "Your plans in time order. Adjust them as life happens.", notesHint: "Small thoughts and important reminders, kept close.",
+      dreamsHint: "Save a little of the world you wake up from.", datesHint: "Keep the days that matter within reach.",
+      staleSchedule: "These plans are dated {date}. Check before following them.", records: "{count} records",
+      summaryMood: "Current mood", summaryEnergy: "Energy today", summaryWarmth: "Relationship warmth",
+      openSection: "Open", summaryEmpty: "Start small. One record is enough.", viewAll: "View all",
+
       appTitle: "Companion Core", appSubtitle: "State · Schedule · Dreams · Notes · Relationship · Dates · Data",
       tabState: "State", tabSchedule: "Schedule", tabDreams: "Dreams",
       tabNotes: "Notes", tabRelationship: "Relationship", tabDates: "Dates", tabData: "Data",
@@ -108,7 +134,7 @@
       confirmDeleteDate: "Delete \"{name}\"?",
       exportData: "Export Data", importData: "Import Data",
       exportDesc: "Download a JSON backup of all companion data.",
-      importDesc: "Restore data from a JSON backup (overwrites existing).",
+      importDesc: "Restore included sections from a JSON backup; dreams merge by date.",
       importSuccess: "Import successful, restored: {fields}",
       exportSuccess: "Data exported", importFailed: "Import failed: {error}",
       timeRequired: "Enter the time", activityRequired: "Enter the activity",
@@ -133,7 +159,12 @@
     });
   }
 
-  function isValidDate(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")); }
+  function isValidDate(s) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s || ""))) return false;
+    var parts = s.split("-"), d = new Date(s + "T12:00:00");
+    return !isNaN(d) && d.getFullYear() === +parts[0] && d.getMonth() + 1 === +parts[1] && d.getDate() === +parts[2];
+  }
+  function matches(text, query) { return String(text || "").toLocaleLowerCase().indexOf(query.trim().toLocaleLowerCase()) >= 0; }
 
   // 后端按本地日期存 key，前端也必须用本地日期：toISOString 是 UTC，
   // 东八区每天 0-8 点会少算一天。
@@ -213,7 +244,9 @@
 
   function apiFetch(path, opts) {
     opts = opts || {};
-    var url = host.getApiUrl(API_PREFIX + path);
+    var url = typeof host.getApiUrl === "function"
+      ? host.getApiUrl(API_PREFIX + "/plugins" + path)
+      : "/api/plugins" + path;
     var token = host.getApiToken ? host.getApiToken() : "";
     var headers = opts.headers || {};
     headers["Content-Type"] = "application/json";
@@ -223,7 +256,11 @@
       headers: headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     }).then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (!res.ok) return res.json().catch(function () { return {}; }).then(function (data) {
+        var detail = data.detail;
+        if (Array.isArray(detail)) detail = detail.map(function (item) { return item.msg; }).join("; ");
+        throw new Error(typeof detail === "string" ? detail : "HTTP " + res.status);
+      });
       return res.status === 204 ? null : res.json();
     });
   }
@@ -257,7 +294,7 @@
     var C = props.C;
     return h("div", { style: { display: "flex", gap: 8, padding: "7px 0", borderBottom: C.fieldBorder } },
       h("div", { style: { width: 64, flexShrink: 0, color: C.sub, fontSize: 13 } }, props.label),
-      h("div", { style: { flex: 1, color: C.text, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, props.children));
+      h("div", { style: { flex: 1, minWidth:100, overflowWrap:"anywhere", color: C.text, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, props.children));
   }
 
   function EditorRow(props) {
@@ -273,7 +310,58 @@
   }
 
   function panelStyle(C) {
-    return { background: C.cardBg, border: C.border, borderRadius: 12, padding: 16 };
+    return { background: C.cardBg, border: C.border, borderRadius: 18, padding: 22, boxShadow: "0 4px 22px rgba(15,23,42,.025)" };
+  }
+
+  function SearchBox(props) {
+    return h(Input, { value: props.value, onChange: function (e) { props.onChange(e.target.value); },
+      placeholder: props.t("search"), "aria-label": props.t("search"), allowClear: true,
+      style: { width: "min(100%, 300px)", marginBottom: 16 } });
+  }
+  function SectionIntro(props) {
+    return h("div", { style: { color: props.C.sub, marginBottom: 20, lineHeight: 1.7 } }, props.children);
+  }
+
+  function OverviewTab(props) {
+    var t = props.t, C = props.C;
+    var s = useAsync(function () {
+      return Promise.all([api.getState(), api.getSchedule(), api.listNotes(false), api.getDates(), api.getRelationship()]);
+    }, []);
+    if (s.loading) return h(LoadingBlock, {t: t, C: C});
+    if (s.error) return h(ErrorBlock, {t: t, C: C, error: s.error, onRetry: s.retry});
+    var state = s.data[0], schedule = s.data[1], notes = s.data[2].filter(function (n) {return !n.reminded;});
+    var dates = (s.data[3].dates || []).map(function (d) {return Object.assign({}, d, {left: daysUntilAnniversary(d.date)});})
+      .filter(function (d) {return d.left !== null;}).sort(function (a,b) {return a.left-b.left;}).slice(0,3);
+    var plans = schedule.date === localToday() ? (schedule.plan || []).slice().sort(function(a,b) {return a.time.localeCompare(b.time);}) : [];
+    function metric(label, value, detail, key, icon) {
+      return h("button", {className: "cc-metric", onClick: function () {props.navigate(key);}},
+        h("span", {className: "cc-metric-icon", "aria-hidden": true}, icon),
+        h("span", {className: "cc-eyebrow"}, label), h("strong", null, value),
+        h("span", {className: "cc-metric-detail"}, detail));
+    }
+    function card(title, key, body) {
+      return h("section", {style: panelStyle(C)}, h(Toolbar, {left: h("h3", {style: {margin: 0, fontSize: 16}}, title),
+        right: h(Button, {type: "link", onClick: function () {props.navigate(key);}}, t("viewAll"))}), body);
+    }
+    return h("div", null,
+      h(Toolbar, {left: h(SectionIntro, {C:C}, t("overviewHint")), right: h(Button, {onClick:s.retry}, t("refresh"))}),
+      h("div", {className: "cc-metrics"},
+        metric(t("summaryMood"), state.mood || "—", state.date || t("summaryEmpty"), "state", "☀"),
+        metric(t("summaryEnergy"), String(state.energy || 0) + "%", state.sleep || "—", "state", "↗"),
+        metric(t("pendingNotes"), notes.length, t("notesHint"), "notes", "✎"),
+        metric(t("summaryWarmth"), String(s.data[4].warmth_score || 0) + "%", t("tabRelationship"), "relationship", "♡")),
+      h("div", {className: "cc-overview-grid"},
+        card(t("nextPlan"), "schedule", plans.length ? plans.slice(0,5).map(function(item,i) {
+          return h("div", {className:"cc-timeline-row", key:i}, h("time", null,item.time), h("span", null,item.activity));
+        }) : h(Empty, {description:t("noPlan")})),
+        card(t("upcoming"), "dates", dates.length ? dates.map(function(item) {
+          return h("div", {className:"cc-date-row", key:item.name}, h("div", null, h("strong", null,item.name), h("small", null,item.date)),
+            h(Tag, {color: item.left === 0 ? "magenta" : "gold"}, item.left === 0 ? t("isToday") : t("inDays", {count:item.left})));
+        }) : h(Empty, {description:t("noDates")}))),
+      h("section", {style: Object.assign({},panelStyle(C),{marginTop:20})},
+        h(Toolbar, {left:h("h3", {style:{margin:0,fontSize:16}},t("pendingNotes")),
+          right:h(Button,{type:"link",onClick:function(){props.navigate("notes");}},t("viewAll"))}),
+        notes.length ? notes.slice(0,3).map(function(note) {return h("div",{className:"cc-note-preview",key:note.id}, note.content);}) : h("p",{style:{color:C.sub}},t("summaryEmpty"))));
   }
 
   // ── Tab: State ───────────────────────────────────────────────────────
@@ -310,11 +398,11 @@
     return h("div", {},
       h(Toolbar, {
         left: h("span", { style: { color: C.sub, fontSize: 13 } }, t("fDate") + ": " + (data.date || "—")),
-        right: h(Space, {},
+        right: h(Space, { wrap: true },
           h(Button, { size: "small", onClick: s.retry }, t("refresh")),
           h(Button, { size: "small", type: "primary", onClick: function () { setForm(Object.assign({}, data)); setEditing(true); } }, t("edit"))),
       }),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 } },
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 } },
         h("div", { style: panelStyle(C) },
           h(Field, { label: t("fMood"), C: C }, h(Tag, { color: "pink" }, data.mood || "—")),
           h(Field, { label: t("fSleep"), C: C }, data.sleep || "—"),
@@ -346,6 +434,7 @@
     var t = props.t, C = props.C;
     var s = useAsync(api.getSchedule, []);
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
+    var _idx = useState(null), editingIndex = _idx[0], setEditingIndex = _idx[1];
     var _f = useState({ time: "", activity: "", mood: "" }), form = _f[0], setForm = _f[1];
     var _g = useState(false), saving = _g[0], setSaving = _g[1];
 
@@ -357,10 +446,10 @@
       return String(a.time || "99:99").localeCompare(String(b.time || "99:99"));
     });
 
-    function savePlan(next, msgKey, after) {
+    function savePlan(next, msgKey, after, selectedDate) {
       if (saving) return;
       setSaving(true);
-      api.updateSchedule({ plan: next })
+      api.updateSchedule({ date: selectedDate || data.date || localToday(), plan: next })
         .then(function () { message.success(t(msgKey)); if (after) after(); s.retry(); })
         .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
         .then(function () { setSaving(false); });
@@ -368,9 +457,11 @@
 
     function addItem() {
       if (!form.time.trim()) { message.warning(t("timeRequired")); return; }
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.time)) { message.warning(t("timeInvalid")); return; }
       if (!form.activity.trim()) { message.warning(t("activityRequired")); return; }
       var entry = { time: form.time.trim(), activity: form.activity.trim(), mood: form.mood.trim() || "平稳" };
-      savePlan(plan.concat([entry]), "saved", function () {
+      savePlan(editingIndex === null ? plan.concat([entry]) : plan.map(function(item,i){return i === editingIndex ? entry : item;}), "saved", function () {
+        setEditingIndex(null);
         setModalOpen(false);
         setForm({ time: "", activity: "", mood: "" });
       });
@@ -381,10 +472,12 @@
     }
 
     return h("div", {},
+      h(SectionIntro, {C:C}, t("scheduleHint")),
+      data.date && data.date !== localToday() ? h("p", {role:"status",style:{color:C.accent}},t("staleSchedule",{date:data.date})) : null,
       h(Toolbar, {
-        left: h(Space, {},
-          h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); } }, t("newSchedule")),
-          h("span", { style: { color: C.sub, fontSize: 13 } }, data.date || "")),
+        left: h(Space, { wrap: true },
+          h(Button, { size: "small", type: "primary", onClick: function () { setEditingIndex(null); setForm({time:"",activity:"",mood:""}); setModalOpen(true); } }, t("newSchedule")),
+          h(Input, {type:"date", "aria-label":t("fDate"), value:data.date || localToday(), disabled:saving, style:{width:155}, onChange:function(e){if(isValidDate(e.target.value)) savePlan(plan,"saved",null,e.target.value);}})),
         right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
       h("div", { style: panelStyle(C) },
@@ -393,21 +486,22 @@
           : plan.map(function (item, idx) {
               return h("div", {
                 key: idx,
-                style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: idx < plan.length - 1 ? C.fieldBorder : "none" },
+                style: { display: "flex", flexWrap:"wrap", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: idx < plan.length - 1 ? C.fieldBorder : "none" },
               },
                 h("span", { style: { fontFamily: "monospace", fontWeight: 600, color: C.accent, width: 52, flexShrink: 0 } }, item.time || ""),
-                h("span", { style: { flex: 1, color: C.text, fontSize: 13 } }, item.activity || ""),
+                h("span", { style: { flex: 1, minWidth:100, overflowWrap:"anywhere", color: C.text, fontSize: 13 } }, item.activity || ""),
                 item.mood ? h(Tag, { color: "purple" }, item.mood) : null,
+                h(Button, {size:"small",type:"link",disabled:saving,onClick:function(){setEditingIndex(idx);setForm(Object.assign({},item));setModalOpen(true);}},t("edit")),
                 h(Popconfirm, { title: t("confirmDeleteSchedule"), onConfirm: function () { removeItem(idx); } },
                   h(Button, { size: "small", type: "link", danger: true, disabled: saving }, t("delete"))));
             })),
       h(Modal, {
-        open: modalOpen, title: t("newSchedule"), okText: t("save"), cancelText: t("cancel"),
+        open: modalOpen, title: t(editingIndex === null ? "newSchedule" : "editSchedule"), okText: t("save"), cancelText: t("cancel"),
         okButtonProps: { loading: saving },
         onCancel: function () { setModalOpen(false); setForm({ time: "", activity: "", mood: "" }); },
         onOk: addItem,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
-        h(EditorRow, { label: t("scheduleTime"), C: C }, h(Input, { placeholder: "08:20", value: form.time, onChange: function (e) { setForm(Object.assign({}, form, { time: e.target.value })); } })),
+        h(EditorRow, { label: t("scheduleTime"), C: C }, h(Input, { type: "time", value: form.time, onChange: function (e) { setForm(Object.assign({}, form, { time: e.target.value })); } })),
         h(EditorRow, { label: t("scheduleActivity"), C: C }, h(Input, { value: form.activity, onChange: function (e) { setForm(Object.assign({}, form, { activity: e.target.value })); } })),
         h(EditorRow, { label: t("scheduleMood"), C: C }, h(Input, { placeholder: "平稳", value: form.mood, onChange: function (e) { setForm(Object.assign({}, form, { mood: e.target.value })); } })))));
   }
@@ -417,21 +511,25 @@
   function DreamsTab(props) {
     var t = props.t, C = props.C;
     var s = useAsync(api.listDreams, []);
+    var _q = useState(""), query = _q[0], setQuery = _q[1];
     var _v = useState(null), viewing = _v[0], setViewing = _v[1];
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ date: "", content: "" }), form = _f[0], setForm = _f[1];
     var _g = useState(false), saving = _g[0], setSaving = _g[1];
     var _p = useState(false), opening = _p[0], setOpening = _p[1];
+    var dreamRequest = React.useRef(0);
+    useEffect(function(){return function(){dreamRequest.current++;};},[]);
 
     if (s.loading) return h(LoadingBlock, { t: t, C: C });
     if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
-    var dreams = s.data || [];
+    var dreams = (s.data || []).filter(function(d){return matches(d.date + " " + d.content,query);});
 
     function openDream(d) {
+      var requestId = ++dreamRequest.current;
       setOpening(true);
-      api.getDream(d).then(setViewing)
-        .catch(function (e) { message.error(t("loadFailed", { error: e.message })); })
-        .then(function () { setOpening(false); });
+      api.getDream(d).then(function(value){if(requestId === dreamRequest.current) setViewing(value);})
+        .catch(function (e) { if(requestId === dreamRequest.current) message.error(t("loadFailed", { error: e.message })); })
+        .then(function () { if(requestId === dreamRequest.current) setOpening(false); });
     }
 
     function submitDream() {
@@ -448,20 +546,22 @@
     }
 
     return h("div", {},
+      h(SectionIntro,{C:C},t("dreamsHint")),
+      h(SearchBox,{t:t,value:query,onChange:setQuery}),
       h(Toolbar, {
-        left: h(Space, {},
+        left: h(Space, { wrap: true },
           h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); } }, t("newDream")),
           h("span", { style: { color: C.sub, fontSize: 13 } }, dreams.length ? t("tabDreams") + " · " + dreams.length : "")),
         right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
       h("div", { style: panelStyle(C) },
         dreams.length === 0
-          ? h(Empty, { description: t("noDreams") })
+          ? h(Empty, { description: t(query ? "noResults" : "noDreams") })
           : dreams.map(function (dream, idx) {
               var preview = String(dream.content || "").replace(/^#.*$/m, "").trim().slice(0, 120);
               return h("div", {
                 key: dream.date || idx,
-                style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: idx < dreams.length - 1 ? C.fieldBorder : "none", cursor: "pointer" },
+                style: { display: "flex", flexWrap:"wrap", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: idx < dreams.length - 1 ? C.fieldBorder : "none", cursor: "pointer" },
                 onClick: function () { openDream(dream.date); },
               },
                 h(Tag, { color: "blue", style: { flexShrink: 0 } }, dream.date),
@@ -470,7 +570,7 @@
             })),
       h(Modal, {
         open: !!viewing || opening, title: viewing ? t("dreamOf", { date: viewing.date }) : "",
-        footer: null, onCancel: function () { setViewing(null); },
+        footer: null, onCancel: function () { dreamRequest.current++; setOpening(false); setViewing(null); },
       }, opening ? h("div", { style: { padding: 24, textAlign: "center" } }, h(Spin, {}))
         : viewing ? h("div", { style: { whiteSpace: "pre-wrap", color: C.text, fontSize: 13, maxHeight: "60vh", overflow: "auto" } }, viewing.content) : null),
       h(Modal, {
@@ -479,8 +579,8 @@
         onCancel: function () { setModalOpen(false); setForm({ date: "", content: "" }); },
         onOk: submitDream,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
-        h(EditorRow, { label: t("dreamDate"), C: C }, h(Input, { placeholder: "YYYY-MM-DD", value: form.date, onChange: function (e) { setForm(Object.assign({}, form, { date: e.target.value })); } })),
-        h(EditorRow, { label: t("dreamContent"), C: C }, h(TextArea, { rows: 5, value: form.content, onChange: function (e) { setForm(Object.assign({}, form, { content: e.target.value })); } })))));
+        h(EditorRow, { label: t("dreamDate"), C: C }, h(Input, { type:"date", value: form.date, onChange: function (e) { setForm(Object.assign({}, form, { date: e.target.value })); } })),
+        h(EditorRow, { label: t("dreamContent"), C: C }, h(TextArea, { rows: 5, maxLength:2000, showCount:true, value: form.content, onChange: function (e) { setForm(Object.assign({}, form, { content: e.target.value })); } })))));
   }
 
   // ── Tab: Notes ───────────────────────────────────────────────────────
@@ -489,33 +589,37 @@
     var t = props.t, C = props.C;
     var _x = useState(false), showExpired = _x[0], setShowExpired = _x[1];
     var s = useAsync(function () { return api.listNotes(showExpired); }, [showExpired]);
+    var _q = useState(""), query = _q[0], setQuery = _q[1];
+    var _p = useState(false), pending = _p[0], setPending = _p[1];
+    var _id = useState(null), editingId = _id[0], setEditingId = _id[1];
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ content: "", expires_at: "" }), form = _f[0], setForm = _f[1];
     var _g = useState(false), busy = _g[0], setBusy = _g[1];
 
     if (s.loading) return h(LoadingBlock, { t: t, C: C });
     if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
-    var notes = s.data || [];
+    var notes = (s.data || []).filter(function(note){return matches(note.content,query) && (!pending || !note.reminded);})
+      .slice().sort(function(a,b){return Number(a.reminded)-Number(b.reminded) || String(b.created_at).localeCompare(String(a.created_at));});
 
-    function runAsync(promise, onOk) {
+    function runAsync(action, onOk) {
       if (busy) return;
       setBusy(true);
-      promise
+      Promise.resolve().then(action)
         .then(function (res) { if (onOk) onOk(res); s.retry(); })
         .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
         .then(function () { setBusy(false); });
     }
 
     function toggleReminded(note) {
-      runAsync(api.updateNote(note.id, { reminded: !note.reminded }));
+      runAsync(function () { return api.updateNote(note.id, { reminded: !note.reminded }); });
     }
 
     function removeNote(id) {
-      runAsync(api.deleteNote(id), function () { message.success(t("deleted")); });
+      runAsync(function () { return api.deleteNote(id); }, function () { message.success(t("deleted")); });
     }
 
     function cleanExpired() {
-      runAsync(api.cleanExpiredNotes(), function (res) {
+      runAsync(function () { return api.cleanExpiredNotes(); }, function (res) {
         message.success(t("cleaned", { count: (res && res.cleaned) || 0 }));
       });
     }
@@ -523,7 +627,10 @@
     function submitCreate() {
       if (!form.content || !form.content.trim()) { message.warning(t("contentRequired")); return; }
       if (form.expires_at && !isValidDate(form.expires_at)) { message.warning(t("dateInvalid")); return; }
-      runAsync(api.createNote({ content: form.content.trim(), expires_at: form.expires_at || "" }), function () {
+      runAsync(function () {
+        var body = {content: form.content.trim(), expires_at: form.expires_at || ""};
+        return editingId ? api.updateNote(editingId, body) : api.createNote(body);
+      }, function () {
         message.success(t("saved"));
         setModalOpen(false);
         setForm({ content: "", expires_at: "" });
@@ -533,9 +640,12 @@
     var today = localToday();
 
     return h("div", {},
+      h(SectionIntro, {C:C}, t("notesHint")),
+      h("div", {className:"cc-search-row"}, h(SearchBox,{t:t,value:query,onChange:setQuery}),
+        h(Button,{type:pending ? "primary" : "default",onClick:function(){setPending(!pending);}},t("pendingOnly"))),
       h(Toolbar, {
-        left: h(Space, {},
-          h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); }, disabled: busy }, t("newNote")),
+        left: h(Space, { wrap: true },
+          h(Button, { size: "small", type: "primary", onClick: function () { setEditingId(null); setForm({content:"",expires_at:""}); setModalOpen(true); }, disabled: busy }, t("newNote")),
           h(Popconfirm, { title: t("cleanExpired"), onConfirm: cleanExpired },
             h(Button, { size: "small", disabled: busy }, t("cleanExpired"))),
           h("span", { style: { color: C.sub, fontSize: 12 } }, t("showExpired")),
@@ -544,16 +654,17 @@
       }),
       h("div", { style: panelStyle(C) },
         notes.length === 0
-          ? h(Empty, { description: t("tabNotes") })
+          ? h(Empty, { description: t(query || pending ? "noResults" : "tabNotes") })
           : notes.map(function (note, idx) {
               var expired = note.expires_at && note.expires_at < today;
               return h("div", {
                 key: note.id || idx,
                 style: { padding: "10px 0", borderBottom: idx < notes.length - 1 ? C.fieldBorder : "none", opacity: expired ? 0.55 : 1 },
               },
-                h("div", { style: { display: "flex", alignItems: "flex-start", gap: 8 } },
-                  h("span", { style: { flex: 1, color: C.text, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, note.content),
-                  h(Space, { size: 4 },
+                h("div", { style: { display: "flex", flexWrap:"wrap", alignItems: "flex-start", gap: 8 } },
+                  h("span", { style: { flex: 1, minWidth:100, overflowWrap:"anywhere", color: C.text, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word" } }, note.content),
+                  h(Space, { size: 4, wrap:true },
+                    h(Button,{size:"small",type:"link",disabled:busy,onClick:function(){setEditingId(note.id);setForm({content:note.content,expires_at:note.expires_at || ""});setModalOpen(true);}},t("edit")),
                     h(Button, { size: "small", type: "link", onClick: function () { toggleReminded(note); }, disabled: busy },
                       note.reminded ? t("notReminded") : t("reminded")),
                     h(Popconfirm, { title: t("confirmDeleteNote"), onConfirm: function () { removeNote(note.id); } },
@@ -566,15 +677,15 @@
                   note.created_at ? h("span", { style: { color: C.muted, fontSize: 11, lineHeight: "22px" } }, note.created_at) : null));
             })),
       h(Modal, {
-        open: modalOpen, title: t("newNote"), okText: t("save"), cancelText: t("cancel"),
+        open: modalOpen, title: t(editingId ? "editNote" : "newNote"), okText: t("save"), cancelText: t("cancel"),
         okButtonProps: { loading: busy },
         onCancel: function () { setModalOpen(false); setForm({ content: "", expires_at: "" }); },
         onOk: submitCreate,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
         h(EditorRow, { label: t("noteContent"), C: C },
-          h(TextArea, { rows: 3, value: form.content, onChange: function (e) { setForm(Object.assign({}, form, { content: e.target.value })); } })),
+          h(TextArea, { rows: 3, maxLength:500, showCount:true, value: form.content, onChange: function (e) { setForm(Object.assign({}, form, { content: e.target.value })); } })),
         h(EditorRow, { label: t("noteExpires"), C: C },
-          h(Input, { placeholder: "YYYY-MM-DD", value: form.expires_at, onChange: function (e) { setForm(Object.assign({}, form, { expires_at: e.target.value })); } })))));
+          h(Input, { type:"date", value: form.expires_at, onChange: function (e) { setForm(Object.assign({}, form, { expires_at: e.target.value })); } })))));
   }
 
   // ── Tab: Relationship ────────────────────────────────────────────────
@@ -608,7 +719,7 @@
           data.last_updated ? t("lastUpdated", { date: data.last_updated }) : ""),
         right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
-      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 } },
+      h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 16 } },
         h("div", { style: panelStyle(C) },
           h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 4 } }, t("warmth")),
           h(Progress, { percent: warmth, strokeColor: C.accent }),
@@ -639,19 +750,23 @@
   // 下一次周年还有几天：日期按 MM-DD 滚动，今年已过就取明年。
   function daysUntilAnniversary(dateStr) {
     var parts = String(dateStr || "").split("-");
-    if (parts.length !== 3) return null;
+    if (!isValidDate(dateStr)) return null;
     var m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
     if (!m || !d) return null;
     var now = new Date();
     var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    var next = new Date(today0.getFullYear(), m - 1, d);
-    if (next < today0) next = new Date(today0.getFullYear() + 1, m - 1, d);
-    return Math.round((next - today0) / 86400000);
+    for (var year = today0.getFullYear(); year <= today0.getFullYear() + 8; year++) {
+      var next = new Date(year, m - 1, d);
+      if (next.getMonth() !== m - 1 || next.getDate() !== d || next < today0) continue;
+      return Math.round((Date.UTC(year,m-1,d) - Date.UTC(today0.getFullYear(),today0.getMonth(),today0.getDate())) / 86400000);
+    }
+    return null;
   }
 
   function DatesTab(props) {
     var t = props.t, C = props.C;
     var s = useAsync(api.getDates, []);
+    var _q = useState(""), query = _q[0], setQuery = _q[1];
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ name: "", date: "", note: "" }), form = _f[0], setForm = _f[1];
     var _g = useState(false), saving = _g[0], setSaving = _g[1];
@@ -659,7 +774,7 @@
     if (s.loading) return h(LoadingBlock, { t: t, C: C });
     if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
 
-    var dates = ((s.data && s.data.dates) || []).slice().sort(function (a, b) {
+    var dates = ((s.data && s.data.dates) || []).filter(function(d){return matches(d.name + " " + d.note + " " + d.date,query);}).slice().sort(function (a, b) {
       var da = daysUntilAnniversary(a.date), db = daysUntilAnniversary(b.date);
       return (da === null ? 1e9 : da) - (db === null ? 1e9 : db);
     });
@@ -686,18 +801,20 @@
     }
 
     return h("div", {},
+      h(SectionIntro,{C:C},t("datesHint")),
+      h(SearchBox,{t:t,value:query,onChange:setQuery}),
       h(Toolbar, {
         left: h(Button, { size: "small", type: "primary", onClick: function () { setModalOpen(true); } }, t("addDate")),
         right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
       }),
       h("div", { style: panelStyle(C) },
         dates.length === 0
-          ? h(Empty, { description: t("noDates") })
+          ? h(Empty, { description: t(query ? "noResults" : "noDates") })
           : dates.map(function (item, idx) {
               var left = daysUntilAnniversary(item.date);
               var label = left === null ? "" : left === 0 ? t("isToday") : left === 1 ? t("tomorrow") : t("inDays", { count: left });
-              return h("div", { key: item.name || idx, style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: idx < dates.length - 1 ? C.fieldBorder : "none" } },
-                h(Tag, { color: item.date === localToday() ? "red" : "magenta", style: { flexShrink: 0, fontFamily: "monospace" } }, item.date || ""),
+              return h("div", { key: item.name || idx, style: { display: "flex", flexWrap:"wrap", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: idx < dates.length - 1 ? C.fieldBorder : "none" } },
+                h(Tag, { color: left === 0 ? "red" : "magenta", style: { flexShrink: 0, fontFamily: "monospace" } }, item.date || ""),
                 h("span", { style: { color: C.text, fontSize: 13, fontWeight: 500 } }, item.name || ""),
                 h("span", { style: { flex: 1, color: C.muted, fontSize: 12 } }, item.note || ""),
                 label ? h(Tag, { color: left === 0 ? "red" : "gold" }, label) : null,
@@ -711,7 +828,7 @@
         onOk: submitAdd,
       }, h("div", { style: { display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 } },
         h(EditorRow, { label: t("dateName"), C: C }, h(Input, { value: form.name, onChange: function (e) { setForm(Object.assign({}, form, { name: e.target.value })); } })),
-        h(EditorRow, { label: t("dateValue"), C: C }, h(Input, { placeholder: "YYYY-MM-DD", value: form.date, onChange: function (e) { setForm(Object.assign({}, form, { date: e.target.value })); } })),
+        h(EditorRow, { label: t("dateValue"), C: C }, h(Input, { type:"date", value: form.date, onChange: function (e) { setForm(Object.assign({}, form, { date: e.target.value })); } })),
         h(EditorRow, { label: t("dateNote"), C: C }, h(Input, { value: form.note, onChange: function (e) { setForm(Object.assign({}, form, { note: e.target.value })); } })))));
   }
 
@@ -756,6 +873,7 @@
               var fields = (res && res.imported) ? res.imported.join(", ") : "";
               message.success(t("importSuccess", { fields: fields }));
               s.retry();
+              if (props.onImport) props.onImport();
             })
             .catch(function (e) { message.error(t("importFailed", { error: e.message })); })
             .then(function () { setImporting(false); });
@@ -799,7 +917,7 @@
       h("div", { style: panelStyle(C) },
         h("div", { style: { fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 12 } }, t("tabData")),
         banner,
-        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 } },
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 16 } },
           h("div", { style: { padding: 16, borderRadius: 8, border: C.border } },
             h("div", { style: { fontWeight: 500, color: C.text, marginBottom: 6 } }, t("exportData")),
             h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 12 } }, t("exportDesc")),
@@ -816,9 +934,31 @@
 
   // ── Root ─────────────────────────────────────────────────────────────
 
-  var APP_VERSION = "2.3.1";
+  var APP_CSS = `
+.cc-app{max-width:1240px;margin:0 auto;padding:28px clamp(12px,3vw,36px) 48px;color:var(--cc-text);background:var(--cc-bg);min-height:100%;font-family:inherit}
+.cc-app *{box-sizing:border-box}.cc-hero{display:flex;justify-content:space-between;gap:24px;align-items:center;padding:32px;border:1px solid rgba(236,72,153,.12);border-radius:24px;background:linear-gradient(115deg,rgba(236,72,153,.09),rgba(251,191,36,.06));margin-bottom:24px;position:relative;overflow:hidden}
+.cc-eyebrow{font-size:11px;letter-spacing:.12em;color:var(--cc-sub);font-weight:600}.cc-hero h1{margin:12px 0 8px;font-size:30px;letter-spacing:-.04em;line-height:1.3}.cc-version{font-size:11px;letter-spacing:0;font-weight:400;color:var(--cc-sub);margin-left:12px}.cc-hero p{margin:0;color:var(--cc-sub);font-size:14px}.cc-today{text-align:right;max-width:260px}.cc-today>span{display:block;font-variant-numeric:tabular-nums;font-size:22px;font-weight:600}.cc-today small{display:block;margin-top:8px;color:var(--cc-sub);line-height:1.7}
+.cc-tabs>.ant-tabs-nav{margin-bottom:24px}.cc-tabs .ant-tabs-tab{padding:12px 4px;font-size:14px}.cc-tabs .ant-tabs-ink-bar{background:var(--cc-accent)}.cc-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn{color:var(--cc-accent)}
+.cc-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}.cc-metric{text-align:left;display:flex;flex-direction:column;position:relative;gap:12px;padding:22px 20px;background:var(--cc-card);color:var(--cc-text);border:1px solid rgba(127,127,127,.14);border-radius:18px;cursor:pointer;min-width:0;font:inherit;transition:transform .18s,border-color .18s}.cc-metric:hover{transform:translateY(-3px);border-color:var(--cc-accent)}.cc-metric:focus-visible{outline:2px solid var(--cc-accent);outline-offset:3px}.cc-metric strong{font-size:25px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}.cc-metric-icon{position:absolute;right:18px;top:16px;font-size:22px;color:var(--cc-accent)}.cc-metric .cc-eyebrow{padding-right:22px;letter-spacing:0}.cc-metric-detail{font-size:12px;color:var(--cc-sub);line-height:1.6;overflow-wrap:anywhere}.cc-overview-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px}.cc-timeline-row{display:flex;gap:20px;padding:15px 0;border-bottom:1px solid rgba(127,127,127,.1);overflow-wrap:anywhere}.cc-timeline-row time{font-variant-numeric:tabular-nums;color:var(--cc-accent);font-weight:600;flex-shrink:0}.cc-date-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid rgba(127,127,127,.1)}.cc-date-row small{display:block;color:var(--cc-sub);margin-top:5px}.cc-note-preview{padding:14px 16px;background:rgba(236,72,153,.04);border-left:3px solid var(--cc-accent);border-radius:4px 10px 10px 4px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.cc-search-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.cc-app .ant-btn{border-radius:8px}.cc-app .ant-input,.cc-app .ant-input-affix-wrapper{border-radius:8px}.cc-app section{min-width:0}.cc-app .ant-tabs-content-holder{min-width:0}
+@media(max-width:760px){.cc-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.cc-overview-grid{grid-template-columns:1fr}.cc-hero{padding:24px}.cc-today{display:none}.cc-hero h1{font-size:26px}.cc-app{padding-top:16px}.cc-app .ant-space{flex-wrap:wrap}.cc-app .ant-tabs-tab+.ant-tabs-tab{margin-left:20px}}
+@media(max-width:760px){.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap{overflow:visible}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.ant-tabs-nav .ant-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.ant-tabs-nav .ant-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-operations,.cc-tabs>.ant-tabs-nav .ant-tabs-ink-bar{display:none}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:before,.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:after{display:none}}
+@media(max-width:420px){.cc-metric{padding:16px 12px}.cc-metric strong{font-size:21px}.cc-metric-icon{right:12px;top:12px}.cc-hero{padding:20px}.cc-hero h1{font-size:24px}}
+@media(prefers-reduced-motion:reduce){.cc-metric{transition:none}}
+`;
+  var APP_VERSION = "";
 
   function CompanionApp() {
+    var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
+    var _rev = useState(0), revision = _rev[0], setRevision = _rev[1];
+    var versionState = useState(APP_VERSION), version = versionState[0], setVersion = versionState[1];
+    useEffect(function () {
+      var active = true;
+      api.health().then(function (data) {
+        APP_VERSION = data.version || "";
+        if (active) setVersion(APP_VERSION);
+      }).catch(function (error) { console.warn("[companion-core] health failed", error); });
+      return function () { active = false; };
+    }, []);
     var locale = normalizeLocale(useHostLocale());
     var themeInfo = useHostTheme();
     var isDark = !!(themeInfo && themeInfo.isDark);
@@ -826,36 +966,50 @@
 
     function t(key, values) { return tr(locale, key, values); }
 
-    return h("div", { style: { padding: "16px 20px", minHeight: "100%", background: C.pageBg, color: C.text } },
-      h("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 8 } },
-        h("span", { style: { fontSize: 26 } }, "💞"),
-        h("div", {},
-          h("div", { style: { fontSize: 18, fontWeight: 600 } },
-            t("appTitle"),
-            h("span", { style: { fontSize: 11, fontWeight: 400, color: C.muted, marginLeft: 8 } }, "v" + APP_VERSION)),
-          h("div", { style: { fontSize: 12, color: C.muted } }, t("appSubtitle")))),
+    return h("div", {className:"cc-app", "data-theme":isDark ? "dark" : "light", style:{"--cc-text":C.text,"--cc-sub":C.sub,"--cc-card":C.cardBg,"--cc-bg":C.pageBg,"--cc-accent":C.accent}},
+      h("style",null,APP_CSS),
+      h("header",{className:"cc-hero"},
+        h("div",{className:"cc-hero-copy"}, h("div",{className:"cc-eyebrow"},"♡  " + t("todayLabel")),
+          h("h1",null,t("appTitle"),h("span",{className:"cc-version"},version ? "v"+version : "")),
+          h("p",null,t("welcome"))),
+        h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")))),
       h(Tabs, {
-        defaultActiveKey: "state",
+        className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
+        destroyInactiveTabPane:true,
         items: [
-          { key: "state", label: "🌤 " + t("tabState"), children: h(StateTab, { t: t, C: C }) },
-          { key: "schedule", label: "📅 " + t("tabSchedule"), children: h(ScheduleTab, { t: t, C: C }) },
-          { key: "dreams", label: "💭 " + t("tabDreams"), children: h(DreamsTab, { t: t, C: C }) },
-          { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { t: t, C: C }) },
-          { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { t: t, C: C }) },
-          { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { t: t, C: C }) },
-          { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t: t, C: C }) },
+          {key:"overview",label:"◈ " + t("tabOverview"),children:h(OverviewTab,{key:revision,t:t,C:C,navigate:setActiveTab})},
+          { key: "state", label: "🌤 " + t("tabState"), children: h(StateTab, { key:revision, t: t, C: C }) },
+          { key: "schedule", label: "📅 " + t("tabSchedule"), children: h(ScheduleTab, { key:revision, t: t, C: C }) },
+          { key: "dreams", label: "💭 " + t("tabDreams"), children: h(DreamsTab, { key:revision, t: t, C: C }) },
+          { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { key:revision, t: t, C: C }) },
+          { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { key:revision, t: t, C: C }) },
+          { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C }) },
+          { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
         ],
       }));
   }
 
   // ── Self-register ────────────────────────────────────────────────────
 
-  QwenPaw.registerRoutes("companion-core", [{
-    path: "/apps/companion-core",
-    component: CompanionApp,
-    label: "陪伴核心",
-    icon: "💞",
-  }]);
-
-  console.info("[companion-core] v" + APP_VERSION + " registered route /apps/companion-core");
+  if (QwenPaw.registerRoutes) {
+    try { QwenPaw.registerRoutes("companion-core", [{
+      path: "/apps/companion-core",
+      component: CompanionApp,
+      label: "陪伴核心",
+      icon: "💞",
+    }]);
+    } catch (e) { console.warn("[companion-core] registerRoutes failed", e); }
+  }
+  if (QwenPaw.menu && QwenPaw.menu.add) {
+    try { QwenPaw.menu.add("companion-core", [{
+      id: "companion-core.menu", location: "primary.settings",
+      label: "陪伴核心", icon: function () { return h("span", null, "💞"); },
+      route: "companion-core.home", order: 45,
+    }]); } catch (e) { console.warn("[companion-core] menu.add failed", e); }
+  }
+  if (QwenPaw.route && QwenPaw.route.add) {
+    try { QwenPaw.route.add("companion-core", [{
+      id: "companion-core.home", path: "/plugin/companion-core", component: CompanionApp,
+    }]); } catch (e) { console.warn("[companion-core] route.add failed", e); }
+  }
 })();

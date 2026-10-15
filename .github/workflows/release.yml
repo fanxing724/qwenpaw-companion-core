@@ -20,10 +20,11 @@ jobs:
 
       - name: Package zip
         run: |
-          zip -r "companion-core-${{ steps.version.outputs.VERSION }}.zip" \
-            plugin.py plugin.json requirements.txt \
-            README.md SKILL.md CHANGELOG.md LICENSE \
-            data/ ui/
+          python3 - <<'PYTHON'
+          import json, os
+          assert json.load(open('plugin.json'))['version'] == os.environ['GITHUB_REF_NAME'].removeprefix('v'), 'Tag and manifest version differ'
+          PYTHON
+          python3 scripts/package.py .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

@@ -7,7 +7,7 @@
 持久化：YAML/JSON 文件存储于 ``~/.qwenpaw/data/companion-core/``。
 首次启动自动补全缺失的种子文件；Agent 通过 REST API 或注册的工具访问所有数据。
 
-接口（挂载于 /api/companion-core/）：
+接口（挂载于 /api/plugins/companion-core/）：
 
   - GET/PUT  /state              状态读写
   - GET/PUT  /schedule           日程读写
@@ -41,19 +41,24 @@ import os
 import re
 import shutil
 import threading
-import time
+from uuid import uuid4
 from datetime import date, datetime
 from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from qwenpaw.pawapp import PawApp
+try:
+    from qwenpaw.pawapp import PawApp
+except ModuleNotFoundError as exc:
+    if exc.name not in {"qwenpaw", "qwenpaw.pawapp"}:
+        raise
+    PawApp = None
 
 logger = logging.getLogger(__name__)
 
-PLUGIN_VERSION = "2.3.1"
+PLUGIN_VERSION = json.loads((Path(__file__).resolve().parent / "plugin.json").read_text(encoding="utf-8"))["version"]
 PLUGIN_NAME = "陪伴核心"
 PLUGIN_ID = "companion-core"
 
@@ -67,7 +72,30 @@ _lock = threading.Lock()
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+def _days_until_anniversary(value: str, today: date) -> int:
+    original = date.fromisoformat(value)
+    for year in range(today.year, today.year + 9):
+        try:
+            upcoming = original.replace(year=year)
+        except ValueError:
+            continue  # February 29 recurs on the next leap year.
+        if upcoming >= today:
+            return (upcoming - today).days
+    raise ValueError("无法计算周年日期")
+
+
 # ── Schemas ──────────────────────────────────────────────────────────
+
+def _validate_date(value: str) -> str:
+    if value:
+        if not _DATE_RE.fullmatch(value):
+            raise ValueError("日期格式须为 YYYY-MM-DD")
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            raise ValueError("日期不存在") from None
+    return value
+
 
 class StateModel(BaseModel):
     date: str = ""
@@ -79,21 +107,34 @@ class StateModel(BaseModel):
     energy: int = Field(default=70, ge=0, le=100)
     note: str = ""
 
+    _valid_date = field_validator("date")(_validate_date)
+
 
 class ScheduleItem(BaseModel):
-    time: str
-    activity: str
+    time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    activity: str = Field(min_length=1, max_length=500)
     mood: str = "平稳"
+
+    @field_validator("activity")
+    @classmethod
+    def validate_activity(cls, value):
+        if not value.strip():
+            raise ValueError("活动不能为空")
+        return value.strip()
 
 
 class ScheduleModel(BaseModel):
     date: str = ""
-    plan: list[ScheduleItem] = []
+    plan: list[ScheduleItem] = Field(default_factory=list)
+
+    _valid_date = field_validator("date")(_validate_date)
 
 
 class DreamModel(BaseModel):
     date: str = ""
     content: str = Field(default="", max_length=2000)
+
+    _valid_date = field_validator("date")(_validate_date)
 
 
 class NoteModel(BaseModel):
@@ -102,6 +143,8 @@ class NoteModel(BaseModel):
     created_at: str = ""
     expires_at: str = ""
     reminded: bool = False
+
+    _valid_expiry = field_validator("expires_at")(_validate_date)
 
 
 class RelationshipModel(BaseModel):
@@ -112,9 +155,18 @@ class RelationshipModel(BaseModel):
 
 
 class ImportantDateModel(BaseModel):
-    name: str
-    date: str
-    note: str = ""
+    name: str = Field(min_length=1, max_length=100)
+    date: str = Field(min_length=10)
+    note: str = Field(default="", max_length=500)
+
+    _valid_date = field_validator("date")(_validate_date)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value):
+        if not value.strip():
+            raise ValueError("名称不能为空")
+        return value.strip()
 
 
 class ImportantDatesModel(BaseModel):
@@ -353,7 +405,7 @@ def create_note(note: NoteModel):
     with _lock:
         notes = _read_notes()
         entry = {
-            "id": f"note_{int(time.time() * 1000)}",
+            "id": f"note_{uuid4().hex}",
             "content": note.content,
             "created_at": note.created_at or _now_ts(),
             "expires_at": expires,
@@ -380,6 +432,8 @@ def clean_expired_notes():
 @router.put("/notes/{note_id}", response_model=NoteModel)
 def update_note(note_id: str, note: NoteModel):
     """更新便签（增量合并，如仅标记 reminded）。"""
+    if "content" in note.model_fields_set and not note.content.strip():
+        raise HTTPException(400, "便签内容不能为空")
     with _lock:
         notes = _read_notes()
         for i, n in enumerate(notes):
@@ -503,8 +557,38 @@ def export_all_data():
 def import_all_data(data: dict):
     """导入数据（覆盖现有数据，用于恢复备份）。
 
-    仅导入已知字段，忽略无效数据。
+    写入前校验全部已知字段；梦境按日期合并，不删除备份外的梦境。
     """
+    # Reject malformed known sections before touching any user files.
+    models = {"state": StateModel, "schedule": ScheduleModel,
+              "relationship": RelationshipModel, "dates": ImportantDatesModel}
+    known = set(models) | {"notes", "dreams"}
+    if not known.intersection(data):
+        raise HTTPException(400, "备份不包含可恢复的数据")
+    try:
+        for name, model in models.items():
+            if name in data:
+                model.model_validate(data[name])
+        if "notes" in data:
+            if not isinstance(data["notes"], list):
+                raise ValueError("notes 必须是列表")
+            ids = []
+            for item in data["notes"]:
+                note = NoteModel.model_validate(item)
+                if not note.id or not note.content.strip():
+                    raise ValueError("便签必须包含 id 和内容")
+                ids.append(note.id)
+            if len(ids) != len(set(ids)):
+                raise ValueError("便签 id 重复")
+        if "dreams" in data:
+            if not isinstance(data["dreams"], list):
+                raise ValueError("dreams 必须是列表")
+            for item in data["dreams"]:
+                if not isinstance(item, dict) or not item.get("date") or not isinstance(item.get("content"), str):
+                    raise ValueError("梦境格式无效")
+                _validate_date(item["date"])
+    except (ValidationError, ValueError, TypeError) as exc:
+        raise HTTPException(400, f"备份格式无效: {exc}") from None
     imported = []
     with _lock:
         if "state" in data and isinstance(data["state"], dict):
@@ -584,6 +668,8 @@ def health():
     dreams_dir = _DATA_DIR / "dreams"
     return {
         "status": "ok",
+        "version": PLUGIN_VERSION,
+        "agent_tools": app is not None,
         "data_dir": str(_DATA_DIR),
         "dreams_count": len(list(dreams_dir.glob("*.md")))
         if dreams_dir.exists()
@@ -594,8 +680,15 @@ def health():
 
 # ── PawApp definition + lifecycle ────────────────────────────────────
 
-app = PawApp(name=PLUGIN_NAME, app_id=PLUGIN_ID)
-app.include_router(router)
+app = PawApp(name=PLUGIN_NAME, app_id=PLUGIN_ID) if PawApp else None
+if app is not None:
+    app.include_router(router)
+
+
+def _agent_tool(*args, **kwargs):
+    if app is not None:
+        return app.tool(*args, **kwargs)
+    return lambda function: function
 
 
 def _text_response(text):
@@ -608,7 +701,7 @@ def _text_response(text):
         return text
 
 
-@app.tool(
+@_agent_tool(
     "companion_get_state",
     description="读取「陪伴核心」的当前状态（心情、精力、睡眠、健康等）。"
                 "当用户询问 Agent 的状态、心情或身体情况时调用。",
@@ -633,7 +726,7 @@ async def companion_get_state():
     return _text_response(text)
 
 
-@app.tool(
+@_agent_tool(
     "companion_get_notes",
     description="读取「陪伴核心」的便签列表。当用户说「帮我记一下」「提醒我」"
                 "或询问有什么待办事项时调用。",
@@ -657,7 +750,7 @@ async def companion_get_notes():
     return _text_response("\n".join(lines))
 
 
-@app.tool(
+@_agent_tool(
     "companion_get_relationship",
     description="读取「陪伴核心」的关系记录（亲密度、里程碑）。"
                 "当需要了解与用户的关系状态时调用。",
@@ -685,7 +778,7 @@ async def companion_get_relationship():
     return _text_response(text)
 
 
-@app.tool(
+@_agent_tool(
     "companion_get_schedule",
     description="读取「陪伴核心」的今日日程。当用户询问今天有什么安排时调用。",
     icon="📅",
@@ -708,7 +801,7 @@ async def companion_get_schedule():
     return _text_response("\n".join(lines))
 
 
-@app.tool(
+@_agent_tool(
     "companion_update_state",
     description="更新「陪伴核心」的状态。当对话中产生了情绪变化、用户问候后"
                 "需要更新心情/精力等状态时调用。仅提交要修改的字段。",
@@ -752,7 +845,7 @@ async def companion_update_state(
     return _text_response(f"已更新状态：{fields}。")
 
 
-@app.tool(
+@_agent_tool(
     "companion_create_note",
     description="创建一条便签。当用户说「帮我记一下」「提醒我」时调用。",
     icon="📝",
@@ -763,23 +856,14 @@ async def companion_create_note(content: str, expires_at: str = ""):
     """创建一条便签。expires_at 为可选的过期日期（YYYY-MM-DD）。"""
     if not content.strip():
         return _text_response("便签内容不能为空。")
-    if expires_at and not _DATE_RE.match(expires_at):
-        return _text_response("过期日期格式须为 YYYY-MM-DD。")
-    with _lock:
-        notes = _read_notes()
-        entry = {
-            "id": f"note_{int(time.time() * 1000)}",
-            "content": content.strip(),
-            "created_at": _now_ts(),
-            "expires_at": expires_at,
-            "reminded": False,
-        }
-        notes.append(entry)
-        _write_json(_DATA_DIR / "notes.json", notes)
+    try:
+        create_note(NoteModel(content=content, expires_at=expires_at))
+    except (ValidationError, HTTPException) as exc:
+        return _text_response(f"便签未保存：{exc}")
     return _text_response(f"已记住：{content.strip()}")
 
 
-@app.tool(
+@_agent_tool(
     "companion_get_important_dates",
     description="读取「陪伴核心」的重要日期（生日、纪念日等）。"
                 "在主动关怀前或用户提及相关话题时调用。",
@@ -804,10 +888,7 @@ async def companion_get_important_dates():
         note = d.get("note", "")
         suffix = ""
         try:
-            d_date = datetime.strptime(dt[:10], "%Y-%m-%d").date()
-            delta = (d_date.replace(year=today.year) - today).days
-            if delta < 0:
-                delta = (d_date.replace(year=today.year + 1) - today).days
+            delta = _days_until_anniversary(dt[:10], today)
             if delta == 0:
                 suffix = "（就是今天！）"
             elif delta <= 7:
@@ -849,11 +930,7 @@ def _build_prompt(agent) -> str:
         for d in dates_list:
             dt_str = d.get("date", "")
             try:
-                d_date = datetime.strptime(dt_str[:10], "%Y-%m-%d").date()
-                anniversary = d_date.replace(year=today_d.year)
-                if anniversary < today_d:
-                    anniversary = d_date.replace(year=today_d.year + 1)
-                delta = (anniversary - today_d).days
+                delta = _days_until_anniversary(dt_str[:10], today_d)
                 if 0 <= delta <= 7:
                     parts.append(f"\n提醒：{d.get('name', '')}（{dt_str}）还有 {delta} 天。")
             except Exception:  # noqa: BLE001
@@ -863,15 +940,12 @@ def _build_prompt(agent) -> str:
     return "\n".join(parts)
 
 
-app.prompt_section(
-    "companion_core",
-    _build_prompt,
-    after="workspace",
-    priority=200,
-)
+if app is not None:
+    app.prompt_section(
+        "companion_core", _build_prompt, after="workspace", priority=200,
+    )
 
 
-@app.on_launch
 async def init_companion():
     """Seed the data directory on app launch and clean up stale data."""
     await asyncio.to_thread(_seed_data)
@@ -889,10 +963,19 @@ async def init_companion():
     )
 
 
-@app.hook("shutdown")
 async def _shutdown() -> None:
     logger.info("[companion] Plugin stopped")
 
 
-# REQUIRED: 模块级 plugin 实例
+if app is not None:
+    app.on_launch(init_companion)
+    app.hook("shutdown")(_shutdown)
+# Standard router loaders do not invoke PawApp lifecycle hooks, even
+# when the optional SDK is installed. Initialize only missing files.
+with _lock:
+    _seed_data()
+if app is None:
+    logger.info("[companion] Router mode: Agent tools require the optional PawApp SDK")
+
+# PawApp loaders use plugin; standard loaders use the module-level router.
 plugin = app
