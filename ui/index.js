@@ -242,26 +242,50 @@
     }
   })();
 
+  function apiUrl(path) {
+    return typeof host.getApiUrl === "function"
+      ? host.getApiUrl(API_PREFIX + path)
+      : "/api" + path;
+  }
+
+  // PawApp mounts at /api/<app_id>; older router loaders use /api/plugins/<id>.
+  // Resolve once with a read-only health request, never retry a mutation.
+  var apiMountPromise;
+  function resolveApiMount() {
+    if (!apiMountPromise) {
+      var token = host.getApiToken ? host.getApiToken() : "";
+      apiMountPromise = fetch(apiUrl("/companion-core/health"), {
+        headers: token ? {Authorization: "Bearer " + token} : {},
+      }).then(function (res) {
+        return res.status === 404 ? "/plugins" : "";
+      }).catch(function (error) {
+        apiMountPromise = null;
+        throw error;
+      });
+    }
+    return apiMountPromise;
+  }
+
   function apiFetch(path, opts) {
     opts = opts || {};
-    var url = typeof host.getApiUrl === "function"
-      ? host.getApiUrl(API_PREFIX + "/plugins" + path)
-      : "/api/plugins" + path;
-    var token = host.getApiToken ? host.getApiToken() : "";
-    var headers = opts.headers || {};
-    headers["Content-Type"] = "application/json";
-    if (token) headers["Authorization"] = "Bearer " + token;
-    return fetch(url, {
-      method: opts.method || "GET",
-      headers: headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-    }).then(function (res) {
-      if (!res.ok) return res.json().catch(function () { return {}; }).then(function (data) {
-        var detail = data.detail;
-        if (Array.isArray(detail)) detail = detail.map(function (item) { return item.msg; }).join("; ");
-        throw new Error(typeof detail === "string" ? detail : "HTTP " + res.status);
+    return resolveApiMount().then(function (mount) {
+      var url = apiUrl(mount + path);
+      var token = host.getApiToken ? host.getApiToken() : "";
+      var headers = opts.headers || {};
+      headers["Content-Type"] = "application/json";
+      if (token) headers["Authorization"] = "Bearer " + token;
+      return fetch(url, {
+        method: opts.method || "GET",
+        headers: headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      }).then(function (res) {
+        if (!res.ok) return res.json().catch(function () { return {}; }).then(function (data) {
+          var detail = data.detail;
+          if (Array.isArray(detail)) detail = detail.map(function (item) { return item.msg; }).join("; ");
+          throw new Error(typeof detail === "string" ? detail : "HTTP " + res.status);
+        });
+        return res.status === 204 ? null : res.json();
       });
-      return res.status === 204 ? null : res.json();
     });
   }
 

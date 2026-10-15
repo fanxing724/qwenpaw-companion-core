@@ -33,19 +33,19 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
-- v2.4.0：新增今日总览、响应式卡片界面、日程/便签编辑及搜索筛选；加强日期时间校验、导入预校验，避免便签 ID 冲突。保留 2.3.2 的标准插件适配。
+- v2.4.1：新增今日总览、响应式卡片界面、日程/便签编辑及搜索筛选；加强日期时间校验、导入预校验，避免便签 ID 冲突。保留 2.3.2 的标准插件适配。
 - v2.3.0：新增 4 个 Agent 工具（共 7 个）、动态系统提示、暗色模式、数据导出/导入 UI、日程编辑与梦境创建
 - v2.2.0：后端入口迁移至 `plugin.py`，数据目录统一为 `~/.qwenpaw/data/companion-core/`，新增 Agent 工具注册与系统提示注入
-- 从 1.x 升级：本版本由旧版 `general` 插件迁移为 `app` 类型 PawApp，API 前缀由 `/api/companion` 变更为 `/api/plugins/companion-core`。如需保留旧数据，将原工作区 `companion_data/` 中的文件复制到 `~/.qwenpaw/data/companion-core/` 即可。
+- 从 1.x 升级：本版本由旧版 `general` 插件迁移为 `app` 类型 PawApp，API 前缀由 `/api/companion` 变更为 `/api/companion-core`。如需保留旧数据，将原工作区 `companion_data/` 中的文件复制到 `~/.qwenpaw/data/companion-core/` 即可。
 
 ## 🚀 安装
 
 ### 本地安装
 
-将 `companion-core-2.4.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.4.1.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.4.0.zip
+qwenpaw plugin install /path/to/companion-core-2.4.1.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -61,26 +61,26 @@ qwenpaw plugin install --force /path/to/companion-core
 
 ## 📖 REST API
 
-安装后通过 HTTP API 管理所有陪伴数据（前缀 `/api/plugins/companion-core`）：
+安装后通过 HTTP API 管理所有陪伴数据（前缀 `/api/companion-core`）：
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/api/plugins/companion-core/state` | GET/PUT | 状态读写（PUT 为增量合并） |
-| `/api/plugins/companion-core/schedule` | GET/PUT | 日程读写 |
-| `/api/plugins/companion-core/dreams` | GET/POST | 梦境列表/创建 |
-| `/api/plugins/companion-core/dreams/{date}` | GET | 指定日期梦境 |
-| `/api/plugins/companion-core/notes` | GET/POST | 便签列表（`?expired=true` 含过期）/创建 |
-| `/api/plugins/companion-core/notes/{id}` | PUT/DELETE | 更新/删除便签 |
-| `/api/plugins/companion-core/notes/expired` | DELETE | 清理过期便签 |
-| `/api/plugins/companion-core/relationship` | GET/PUT | 关系读写 |
-| `/api/plugins/companion-core/relationship/decay` | POST | 应用关系衰减 |
-| `/api/plugins/companion-core/dates` | GET/POST | 重要日期列表/添加 |
-| `/api/plugins/companion-core/dates/{name}` | DELETE | 删除重要日期 |
-| `/api/plugins/companion-core/export` | GET | 导出所有数据（备份） |
-| `/api/plugins/companion-core/import` | POST | 导入数据（恢复） |
-| `/api/plugins/companion-core/health` | GET | 健康检查 |
+| `/api/companion-core/state` | GET/PUT | 状态读写（PUT 为增量合并） |
+| `/api/companion-core/schedule` | GET/PUT | 日程读写 |
+| `/api/companion-core/dreams` | GET/POST | 梦境列表/创建 |
+| `/api/companion-core/dreams/{date}` | GET | 指定日期梦境 |
+| `/api/companion-core/notes` | GET/POST | 便签列表（`?expired=true` 含过期）/创建 |
+| `/api/companion-core/notes/{id}` | PUT/DELETE | 更新/删除便签 |
+| `/api/companion-core/notes/expired` | DELETE | 清理过期便签 |
+| `/api/companion-core/relationship` | GET/PUT | 关系读写 |
+| `/api/companion-core/relationship/decay` | POST | 应用关系衰减 |
+| `/api/companion-core/dates` | GET/POST | 重要日期列表/添加 |
+| `/api/companion-core/dates/{name}` | DELETE | 删除重要日期 |
+| `/api/companion-core/export` | GET | 导出所有数据（备份） |
+| `/api/companion-core/import` | POST | 导入数据（恢复） |
+| `/api/companion-core/health` | GET | 健康检查 |
 
-旧版 `/api/companion-core/*` 地址不再用于标准插件模式，已有外部脚本和 Agent 技能请同步改为 `/api/plugins/companion-core/*`。原用户数据目录不变。
+PawApp SDK 模式遵循官方 Creator 的路由约定，使用 `/api/companion-core/*`。旧版标准 router 加载器使用 `/api/plugins/companion-core/*`；仪表盘通过只读健康检查自动兼容这两种模式。外部脚本请按宿主实际加载模式选择前缀。
 
 ## 🤖 Agent 工具
 
@@ -115,7 +115,7 @@ companion-core/
 └── important_dates.yaml # 重要日期
 ```
 
-首次加载会自动补全缺失的种子文件，不覆盖已有文件。可通过 `/api/plugins/companion-core/export` 导出备份，`/api/plugins/companion-core/import` 恢复。
+首次加载会自动补全缺失的种子文件，不覆盖已有文件。可通过 `/api/companion-core/export` 导出备份，`/api/companion-core/import` 恢复。
 
 ## 🎨 自定义指南
 

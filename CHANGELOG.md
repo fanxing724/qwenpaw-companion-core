@@ -1,3 +1,9 @@
+# v2.4.1
+
+- 对照官方 QwenPaw Creator 2.0.1，修正 PawApp 模式 API 前缀为 `/api/companion-core`，解决各页面读取失败 / Not Found。
+- 通过共享的只读健康探针兼容旧版 `/api/plugins/companion-core` 路由，写操作不重试；保留宿主 API 基址和认证。
+- 增加 SDK/标准 router 两种后端挂载及前端路径回归验证。
+
 # 更新日志
 
 本文件记录陪伴核心插件的所有重要变更。

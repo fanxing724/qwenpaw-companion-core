@@ -43,14 +43,15 @@ def loaded(request, tmp_path, monkeypatch):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     web = FastAPI()
-    web.include_router(module.router, prefix='/api/plugins/companion-core')
+    web.include_router(module.app.router if request.param else module.router,
+                       prefix='/api/companion-core' if request.param else '/api/plugins/companion-core')
     with TestClient(web) as client:
         yield module, client, tmp_path, bool(request.param)
 
 
 def test_load_and_preserve_existing_data(loaded):
     module, client, data, sdk = loaded
-    prefix = '/api/plugins/companion-core'
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
     health = client.get(prefix + '/health').json()
     assert health['version'] == json.loads((ROOT / 'plugin.json').read_text())['version']
     assert health['agent_tools'] is sdk
@@ -64,8 +65,8 @@ def test_load_and_preserve_existing_data(loaded):
 
 
 def test_dashboard_data_and_restore(loaded):
-    _, client, _, _ = loaded
-    prefix = '/api/plugins/companion-core'
+    _, client, _, sdk = loaded
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
     for path in ['/state', '/schedule', '/dreams', '/notes', '/relationship', '/dates']:
         assert client.get(prefix + path).status_code == 200
     note = client.post(prefix + '/notes', json={'content': '记得喝水'}).json()
@@ -82,8 +83,8 @@ def test_dashboard_data_and_restore(loaded):
 
 
 def test_invalid_updates_and_import_do_not_change_data(loaded):
-    _, client, _, _ = loaded
-    prefix = '/api/plugins/companion-core'
+    _, client, _, sdk = loaded
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
     original = client.get(prefix + '/export').json()
     for path, body in [('/dreams', {'date': '2026-02-30', 'content': 'x'}),
                        ('/notes', {'content': 'x', 'expires_at': '2026-13-01'}),
@@ -99,8 +100,8 @@ def test_invalid_updates_and_import_do_not_change_data(loaded):
 
 
 def test_note_ids_are_unique_and_edit_preserves_metadata(loaded):
-    _, client, _, _ = loaded
-    prefix = '/api/plugins/companion-core'
+    _, client, _, sdk = loaded
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
     notes = [client.post(prefix + '/notes', json={'content': '便签'}).json() for _ in range(20)]
     assert len({n['id'] for n in notes}) == 20
     note = notes[0]

@@ -7,7 +7,7 @@
 持久化：YAML/JSON 文件存储于 ``~/.qwenpaw/data/companion-core/``。
 首次启动自动补全缺失的种子文件；Agent 通过 REST API 或注册的工具访问所有数据。
 
-接口（挂载于 /api/plugins/companion-core/）：
+接口（挂载于 /api/companion-core/）：
 
   - GET/PUT  /state              状态读写
   - GET/PUT  /schedule           日程读写

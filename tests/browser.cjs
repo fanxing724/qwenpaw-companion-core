@@ -8,8 +8,8 @@ const today=new Date().toLocaleDateString('en-CA');
 const db={state:{date:today,mood:'平静而充实',energy:78,sleep:'昨晚睡了 8 小时',health:'状态不错',hunger:'刚刚好',dream:'穿过一片森林',note:'给自己留一点慢下来的时间'},schedule:{date:today,plan:[{time:'09:00',activity:'读书与晨间整理',mood:'期待'},{time:'14:00',activity:'去公园散步',mood:'放松'},{time:'20:30',activity:'记录今天的小确幸',mood:'平静'}]},notes:[{id:'n1',content:'周末一起去看展，记得提前预约。',created_at:today,expires_at:'',reminded:false},{id:'n2',content:'给家里的绿植浇水',created_at:today,expires_at:'',reminded:false}],relationship:{warmth_score:82,notes:'一起积累平凡而闪亮的日子。',milestones:[{date:'2026-10-01',event:'第一次一起看日落'}]},dates:{dates:[{name:'相遇纪念日',date:today,note:'记得这一天'},{name:'生日',date:'2000-12-20',note:'准备一份小惊喜'}]},dreams:[{date:today,content:'# '+today+' 的梦\n\n梦见穿过一片森林，树叶闪着光。'}]};
 const scriptFiles={'/react.js':'react/umd/react.development.js','/react-dom.js':'react-dom/umd/react-dom.development.js','/dayjs.js':'dayjs/dayjs.min.js','/antd.js':'antd/dist/antd.min.js','/reset.css':'antd/dist/reset.css'};
 const server=http.createServer(async(req,res)=>{
- if(req.url.startsWith('/api/plugins/companion-core/')){
-  const endpoint=req.url.replace('/api/plugins/companion-core/','').split('?')[0];let body='';for await(const c of req)body+=c;const payload=body?JSON.parse(body):{};
+ if(req.url.startsWith('/api/companion-core/')){
+  const endpoint=req.url.replace('/api/companion-core/','').split('?')[0];let body='';for await(const c of req)body+=c;const payload=body?JSON.parse(body):{};
   if(req.method==='PUT'){
    if(endpoint.startsWith('notes/'))Object.assign(db.notes.find(n=>n.id===endpoint.split('/')[1]),payload);
    else Object.assign(db[endpoint],payload);

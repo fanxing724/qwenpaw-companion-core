@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('ui/index.js', 'utf8');
-for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-failure']) {
+(async () => {
+for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-failure', 'legacy-router', 'base-path']) {
   const calls = [], requests = [], effects = [];
   const React = {
     createElement: (type, props, ...children) => ({type, props, children}),
@@ -11,7 +12,7 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
     useRef: value => ({current: value}),
   };
   const host = {React, antd: {Input: {TextArea: {}}}};
-  if (mode !== 'no-helper') host.getApiUrl = p => mode === 'api-prefix' ? '/api' + p : p;
+  if (mode !== 'no-helper') host.getApiUrl = p => mode === 'api-prefix' ? '/api' + p : mode === 'base-path' ? '/paw/api' + p : p;
   const qp = {host, menu: {add: (id, items) => calls.push(['menu', items])},
     route: {add: (id, items) => calls.push(['route', items])}};
   if (mode !== 'menu-only') qp.registerRoutes = (id, items) => {
@@ -19,17 +20,24 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
     calls.push(['apps', items]);
   };
   const context = {window: {QwenPaw: qp}, console: {warn() {}, error() {}},
-    fetch: (url) => {requests.push(url); return Promise.resolve({ok: true, json: () => Promise.resolve({version: '2.4.0'})});}};
-  vm.runInNewContext(source, context);
+    fetch: (url, opts) => {requests.push(url); const missing = mode === 'legacy-router' && !url.includes('/plugins/'); return Promise.resolve({ok: !missing, status: missing ? 404 : 200, json: () => Promise.resolve({version: '2.4.0'})});}};
+  vm.runInNewContext(source.replace('  var api = {', '  window.testApi = apiFetch;\n  var api = {'), context);
   assert(calls.some(c => c[0] === 'menu'));
   const route = calls.find(c => c[0] === 'route')[1][0];
   assert.equal(route.id, 'companion-core.home');
   const tree = route.component();
   assert.equal(tree.children.at(-1).props.items.length, 8);
   effects[0]();
-  assert.equal(requests[0], '/api/plugins/companion-core/health', mode);
+  await new Promise(resolve => setImmediate(resolve));
+  const base = mode === 'base-path' ? '/paw/api' : '/api';
+  const mount = mode === 'legacy-router' ? '/plugins' : '';
+  assert.equal(requests[0], base + '/companion-core/health', mode);
+  assert.equal(requests[1], base + mount + '/companion-core/health', mode);
+  await context.window.testApi('/companion-core/state', {method:'PUT', body:{energy:50}});
+  assert.equal(requests.at(-1), base + mount + '/companion-core/state', mode);
+  assert.equal(requests.length, 3, 'one discovery probe and no mutation retries');
 }
-console.log('Frontend: 5 host modes, routes, eight tabs and health API passed');
+console.log('Frontend: 7 host modes, routes, eight tabs and health API passed');
 
 // Evaluate date helpers in isolation without adding production globals.
 const helperContext = {window:{QwenPaw:{host:{React:{createElement(){}, useState(){}, useEffect(){}},antd:{Input:{}}}}},console};
@@ -40,3 +48,5 @@ assert.equal(dates.isValidDate('2028-02-29'), true);
 assert.equal(dates.isValidDate('2026-13-01'), false);
 assert.equal(dates.daysUntilAnniversary('invalid'), null);
 console.log('Date helpers: invalid calendar dates rejected, leap day accepted');
+
+})().catch(error => {console.error(error); process.exitCode = 1;});

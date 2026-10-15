@@ -16,41 +16,43 @@ metadata:
 
 ## 数据访问
 
-所有陪伴数据由 companion-core 应用统一存储和管理（`~/.qwenpaw/data/companion-core/`），**通过 REST API 读写**，API 前缀为 QwenPaw 服务下的 `/api/plugins/companion-core/`：
+所有陪伴数据由 companion-core 应用统一存储和管理（`~/.qwenpaw/data/companion-core/`），**通过 REST API 读写**，API 前缀为 QwenPaw 服务下的 `/api/companion-core/`：
 
 | 路径 | 方法 | 说明 |
 |------|------|------|
-| `/api/plugins/companion-core/state` | GET/PUT | 状态读写 |
-| `/api/plugins/companion-core/schedule` | GET/PUT | 日程读写 |
-| `/api/plugins/companion-core/dreams` | GET/POST | 梦境列表/创建 |
-| `/api/plugins/companion-core/dreams/{date}` | GET | 指定日期梦境 |
-| `/api/plugins/companion-core/notes?expired=true` | GET | 便签列表（可含过期） |
-| `/api/plugins/companion-core/notes` | POST | 创建便签 |
-| `/api/plugins/companion-core/notes/{id}` | PUT/DELETE | 更新/删除便签 |
-| `/api/plugins/companion-core/notes/expired` | DELETE | 清理过期便签 |
-| `/api/plugins/companion-core/relationship` | GET/PUT | 关系读写 |
-| `/api/plugins/companion-core/relationship/decay` | POST | 应用关系衰减 |
-| `/api/plugins/companion-core/dates` | GET/POST | 重要日期列表/添加 |
-| `/api/plugins/companion-core/dates/{name}` | DELETE | 删除重要日期 |
-| `/api/plugins/companion-core/export` | GET | 导出所有数据（备份） |
-| `/api/plugins/companion-core/import` | POST | 导入数据（恢复） |
-| `/api/plugins/companion-core/health` | GET | 健康检查 |
+| `/api/companion-core/state` | GET/PUT | 状态读写 |
+| `/api/companion-core/schedule` | GET/PUT | 日程读写 |
+| `/api/companion-core/dreams` | GET/POST | 梦境列表/创建 |
+| `/api/companion-core/dreams/{date}` | GET | 指定日期梦境 |
+| `/api/companion-core/notes?expired=true` | GET | 便签列表（可含过期） |
+| `/api/companion-core/notes` | POST | 创建便签 |
+| `/api/companion-core/notes/{id}` | PUT/DELETE | 更新/删除便签 |
+| `/api/companion-core/notes/expired` | DELETE | 清理过期便签 |
+| `/api/companion-core/relationship` | GET/PUT | 关系读写 |
+| `/api/companion-core/relationship/decay` | POST | 应用关系衰减 |
+| `/api/companion-core/dates` | GET/POST | 重要日期列表/添加 |
+| `/api/companion-core/dates/{name}` | DELETE | 删除重要日期 |
+| `/api/companion-core/export` | GET | 导出所有数据（备份） |
+| `/api/companion-core/import` | POST | 导入数据（恢复） |
+| `/api/companion-core/health` | GET | 健康检查 |
 
 用 `curl` 或 `web_fetch` 调用这些 API。PUT 接口为**增量合并**：只需提交要修改的字段。
 
 示例：
 
+旧版标准 router 加载器可能使用 `/api/plugins/companion-core/`；请先访问 `/health` 确认宿主实际前缀。
+
 ```bash
 # 读取状态
-curl http://127.0.0.1:8000/api/plugins/companion-core/state
+curl http://127.0.0.1:8000/api/companion-core/state
 
 # 只更新心情和精力
-curl -X PUT http://127.0.0.1:8000/api/plugins/companion-core/state \
+curl -X PUT http://127.0.0.1:8000/api/companion-core/state \
   -H "Content-Type: application/json" \
   -d '{"mood": "心情超好～", "energy": 85}'
 
 # 创建一条会过期的便签
-curl -X POST http://127.0.0.1:8000/api/plugins/companion-core/notes \
+curl -X POST http://127.0.0.1:8000/api/companion-core/notes \
   -H "Content-Type: application/json" \
   -d '{"content": "用户说下周要考试", "expires_at": "2026-07-30"}'
 ```
@@ -96,8 +98,8 @@ note: "今天状态超好，开开心心过一天啦"
 ```
 
 ### 操作方式
-- **读取**：`GET /api/plugins/companion-core/state`
-- **更新**：用户问状态时，自然回答 + `PUT /api/plugins/companion-core/state` 更新对应字段
+- **读取**：`GET /api/companion-core/state`
+- **更新**：用户问状态时，自然回答 + `PUT /api/companion-core/state` 更新对应字段
 - **重置**：每天凌晨日记整理时 PUT 新的一天的状态
 
 ---
@@ -111,7 +113,7 @@ note: "今天状态超好，开开心心过一天啦"
 ### 梦境生成规则
 1. 读取今天的日记 + 最近几天的互动
 2. 用 LLM 生成一段自然、有具体场景的梦境
-3. `POST /api/plugins/companion-core/dreams`，body 为 `{"date": "YYYY-MM-DD", "content": "..."}`（同一天多次创建会自动追加）
+3. `POST /api/companion-core/dreams`，body 为 `{"date": "YYYY-MM-DD", "content": "..."}`（同一天多次创建会自动追加）
 4. state 里的 `dream` 字段会随之自动更新
 
 ### 梦境内容格式
@@ -159,8 +161,8 @@ plan:
 ```
 
 ### 操作方式
-- **生成**：每天首次问候时，`PUT /api/plugins/companion-core/schedule` 写入当日日程
-- **查看**：用户问时 `GET /api/plugins/companion-core/schedule` 并自然回答
+- **生成**：每天首次问候时，`PUT /api/companion-core/schedule` 写入当日日程
+- **查看**：用户问时 `GET /api/companion-core/schedule` 并自然回答
 - **重置**：每天凌晨重置
 
 ---
@@ -189,9 +191,9 @@ plan:
 }
 ```
 
-- 用户说"帮我记一下"时 `POST /api/plugins/companion-core/notes` 创建
-- 主动关怀前 `GET /api/plugins/companion-core/notes` 查看到期便签并提醒，提醒后 `PUT /api/plugins/companion-core/notes/{id}` 置 `reminded: true`
-- 过期便签用 `DELETE /api/plugins/companion-core/notes/expired` 清理
+- 用户说"帮我记一下"时 `POST /api/companion-core/notes` 创建
+- 主动关怀前 `GET /api/companion-core/notes` 查看到期便签并提醒，提醒后 `PUT /api/companion-core/notes/{id}` 置 `reminded: true`
+- 过期便签用 `DELETE /api/companion-core/notes/expired` 清理
 - `expires_at` 留空表示不过期
 
 ### 关系记录（relationship）
@@ -207,12 +209,12 @@ warmth_score: 50
 notes: "记录点滴"
 ```
 
-- 互动中出现值得纪念的事件时，`PUT /api/plugins/companion-core/relationship` 追加 milestone、调整 warmth_score
+- 互动中出现值得纪念的事件时，`PUT /api/companion-core/relationship` 追加 milestone、调整 warmth_score
 - `last_updated` 由 API 自动维护
 
 ### 重要日期（dates）
 
-- `GET/POST /api/plugins/companion-core/dates` 管理生日、纪念日等
+- `GET/POST /api/companion-core/dates` 管理生日、纪念日等
 - 主动关怀前可查看，临近的重要日期可提前准备祝福
 
 ---
