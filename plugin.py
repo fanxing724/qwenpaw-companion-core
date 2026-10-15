@@ -1104,6 +1104,16 @@ async def _shutdown() -> None:
 if app is not None:
     app.on_launch(init_companion)
     app.hook("shutdown")(_shutdown)
+# Load from the plugin directory independently of host sys.path behavior.
+import importlib.util as _importlib_util
+_organizer_spec = _importlib_util.spec_from_file_location(
+    "companion_chat_organizer", _PLUGIN_DIR / "organizer.py")
+_organizer_module = _importlib_util.module_from_spec(_organizer_spec)
+_organizer_spec.loader.exec_module(_organizer_module)
+organizer = _organizer_module.install(router, globals())
+if app is not None:
+    app.hook("shutdown")(organizer.shutdown)
+
 # Standard router loaders do not invoke PawApp lifecycle hooks, even
 # when the optional SDK is installed. Initialize only missing files.
 with _lock:

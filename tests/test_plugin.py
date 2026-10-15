@@ -217,3 +217,227 @@ def test_no_active_ui_agent_fallback_for_call_tracking(loaded, monkeypatch):
         assert module._current_agent_id() == 'real-agent'
     finally:
         context_module._current_agent_id.reset(token)
+
+
+@pytest.fixture
+def organizer_host(binding_host, monkeypatch):
+    from types import SimpleNamespace as NS
+    module, client, sdk, _, _, _ = binding_host
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
+    if sdk:
+        client.put(prefix + '/agents/alice/binding', json={'enabled':True})
+    organizer = module.organizer
+    chat = NS(id='chat-a', name='Recent chat', session_id='session-a', user_id='user-a', channel='console', updated_at='2026-10-15')
+    state = {'agent':{'state':{'context':[
+        {'role':'system','content':'SYSTEM SECRET'},
+        {'role':'user','content':[{'type':'text','text':'今天心情很开心，记得喝水。'},{'type':'image','source':'PRIVATE IMAGE'}]},
+        {'role':'tool','content':'TOOL SECRET'},
+        {'role':'assistant','content':'我会记住喝水。'},
+    ]}}}
+    async def history(*args):
+        assert args == ('session-a','user-a','console')
+        return state
+    async def chats(): return [chat]
+    async def get_chat(key): return chat if key == chat.id else None
+    workspace = NS(session=NS(get_session_state_dict=history),chat_manager=NS(list_chats=chats,get_chat=get_chat))
+    async def get_workspace(request, agent_id):
+        organizer.require_bound(agent_id)
+        return workspace
+    monkeypatch.setattr(organizer, 'workspace', get_workspace)
+    config = organizer.settings().model_dump()
+    config.update(base_url='http://localhost:9999/v1',model='small-cheap-model',api_key='test-only-key')
+    for key in config['modules']:
+        config['modules'][key]['enabled'] = key == 'state'
+    assert client.put(prefix+'/organizer/config', json=config).status_code == 200
+    return module, client, sdk, prefix, organizer, workspace, chat, state
+
+
+def test_organizer_secret_storage_and_provider_inheritance(organizer_host):
+    module, client, _, prefix, organizer, _, _, _ = organizer_host
+    response = client.get(prefix+'/organizer/config')
+    assert response.status_code == 200
+    assert 'test-only-key' not in response.text
+    assert response.json()['config']['api_key_configured']
+    assert organizer.path.stat().st_mode & 0o777 == 0o600
+    assert 'test-only-key' not in client.get(prefix+'/export').text
+    config = response.json()['config']
+    config['modules']['notes']['base_url'] = 'https://different.example/v1'
+    assert client.put(prefix+'/organizer/config', json=config).status_code == 200
+    stored = organizer.settings()
+    assert stored.api_key == 'test-only-key'
+    assert organizer.provider(stored,'notes')[2] == ''
+    config['clear_api_key'] = True
+    assert client.put(prefix+'/organizer/config',json=config).status_code == 200
+    assert organizer.settings().api_key == ''
+    config['base_url'] = 'file:///etc/passwd'
+    assert client.put(prefix+'/organizer/config',json=config).status_code == 422
+
+
+def test_organizer_preview_apply_and_backup(organizer_host, monkeypatch):
+    module, client, sdk, prefix, organizer, _, _, _ = organizer_host
+    if not sdk:
+        assert client.post(prefix+'/organizer/preview',json={'agent_id':'alice','chat_id':'chat-a'}).status_code == 503
+        return
+    def complete(provider, messages, tokens):
+        assert provider[1] == 'small-cheap-model'
+        assert tokens == 1200
+        assert all(secret not in json.dumps(messages) for secret in ['SYSTEM SECRET','TOOL SECRET','PRIVATE IMAGE'])
+        return {'mood':'非常开心'}, {'prompt_tokens':123,'completion_tokens':20,'total_tokens':143,'unexpected':'hidden'}
+    monkeypatch.setattr(organizer,'complete',complete)
+    before = client.get(prefix+'/state').json()
+    chats = client.get(prefix+'/organizer/chats?agent_id=alice').json()
+    assert chats['chats'][0]['id']=='chat-a'
+    assert client.post(prefix+'/organizer/preview',json={'agent_id':'alice','chat_id':'wrong'}).status_code == 404
+    preview = client.post(prefix+'/organizer/preview',json={'agent_id':'alice','chat_id':'chat-a'})
+    assert preview.status_code == 200, preview.text
+    data = preview.json()
+    assert data['message_count']==2 and data['requests']==1
+    assert data['usage'][0]['usage']['total_tokens']==143
+    assert 'unexpected' not in data['usage'][0]['usage']
+    assert client.get(prefix+'/state').json()==before
+    result = client.post(prefix+'/organizer/apply',json={'preview_id':data['preview_id']})
+    assert result.status_code == 200, result.text
+    assert client.get(prefix+'/state').json()['mood']=='非常开心'
+    backups = list((module._DATA_DIR/'organizer-backups').glob('*.json'))
+    assert len(backups)==1 and json.loads(backups[0].read_text())['state']==before
+    assert client.post(prefix+'/organizer/apply',json={'preview_id':data['preview_id']}).status_code == 410
+
+
+def test_organizer_rejects_invalid_results_and_conflicts(organizer_host, monkeypatch):
+    _, client, sdk, prefix, organizer, _, _, _ = organizer_host
+    if not sdk: return
+    before = organizer.snapshot()
+    monkeypatch.setattr(organizer,'complete',lambda *args: ({'energy':1000},{}))
+    request = {'agent_id':'alice','chat_id':'chat-a'}
+    assert client.post(prefix+'/organizer/preview',json=request).status_code==422
+    assert organizer.snapshot()==before
+    monkeypatch.setattr(organizer,'complete',lambda *args: ({'mood':'开心'},{}))
+    preview=client.post(prefix+'/organizer/preview',json=request).json()
+    client.put(prefix+'/state',json={'mood':'用户刚刚修改的内容'})
+    assert client.post(prefix+'/organizer/apply',json={'preview_id':preview['preview_id']}).status_code==409
+    assert client.get(prefix+'/state').json()['mood']=='用户刚刚修改的内容'
+    assert client.post(prefix+'/organizer/preview',json={'agent_id':'bob','chat_id':'chat-a'}).status_code==409
+
+
+def test_organizer_bounded_text_and_upserts(organizer_host):
+    _, _, _, _, organizer, _, _, state = organizer_host
+    text = organizer.c['_organizer_module'].text_messages(state,2,5)
+    assert sum(len(msg['content']) for msg in text)==5
+    assert len(text)==1
+    note = organizer.prepare('notes',[{'content':'记得喝水'}],[])
+    assert note[0]['id'] and note[0]['created_at']
+    assert organizer.prepare('notes',[{'content':'记得喝水'}],note)==note
+    with pytest.raises(ValueError):
+        organizer.prepare('notes',[{'id':'unknown','content':'bad'}],[])
+    dates = [{'name':'生日','date':'2000-12-01','note':''}]
+    assert len(organizer.prepare('dates',[{'name':'纪念日','date':'2026-10-01'}],dates))==2
+    with pytest.raises(ValueError):
+        organizer.prepare('dreams',[{'date':'../../outside','content':'bad'}],[])
+
+
+def test_organizer_auto_hook_cooldown_dedup_and_stop(organizer_host, monkeypatch):
+    import asyncio
+    from types import SimpleNamespace as NS
+    _, client, sdk, prefix, organizer, workspace, chat, _ = organizer_host
+    if not sdk: return
+    hooks = types.ModuleType('qwenpaw.runtime.hooks')
+    hooks.HookBase = type('HookBase',(),{})
+    hooks.HookResult = type('HookResult',(),{})
+    phases = types.ModuleType('qwenpaw.runtime.phases')
+    phases.Phase = NS(POST_RESPONSE='post_response')
+    monkeypatch.setitem(sys.modules,'qwenpaw.runtime.hooks',hooks)
+    monkeypatch.setitem(sys.modules,'qwenpaw.runtime.phases',phases)
+    registered=[]
+    organizer.c['app'].runtime_hook=registered.append
+    organizer.register_auto()
+    assert organizer.auto_supported
+    config=client.get(prefix+'/organizer/config').json()['config']
+    config.update(auto_enabled=True,agent_id='alice')
+    assert client.put(prefix+'/organizer/config',json=config).status_code==200
+    calls=[]
+    monkeypatch.setattr(organizer,'complete',lambda *args:(calls.append(1) or {'mood':'自动整理的心情'},{}))
+    ctx=NS(agent_id='alice',workspace=workspace,session_id=chat.session_id,error=None,
+           request=NS(user_id=chat.user_id,channel=chat.channel),extras={'qwenpaw.session_save_succeeded':True})
+    async def run():
+        await registered[0].run(ctx)
+        await asyncio.gather(*list(organizer.tasks))
+        assert len(calls)==1
+        await registered[0].run(ctx)
+        assert not organizer.tasks
+        organizer.cooldown.clear()
+        await registered[0].run(ctx)
+        await asyncio.gather(*list(organizer.tasks))
+        assert len(calls)==1  # unchanged history/config never calls a model again
+        config['auto_enabled']=False
+        client.put(prefix+'/organizer/config',json=config)
+        organizer.cooldown.clear()
+        await registered[0].run(ctx)
+        assert not organizer.tasks
+    asyncio.run(run())
+    assert client.get(prefix+'/state').json()['mood']=='自动整理的心情'
+
+
+def test_organizer_real_http_contract_and_redirect_secret_protection(organizer_host):
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    _, _, _, _, organizer, _, _, _ = organizer_host
+    requests=[]
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self,*args): pass
+        def do_POST(self):
+            body=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            requests.append((self.path,self.headers.get('Authorization'),body))
+            if self.path.startswith('/redirect'):
+                self.send_response(302);self.send_header('Location','/leaked');self.end_headers();return
+            self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers()
+            self.wfile.write(json.dumps({'choices':[{'message':{'content':'{"changes":{"mood":"快乐"}}'},'finish_reason':'stop'}],
+                                        'usage':{'total_tokens':20}}).encode())
+    server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        base='http://127.0.0.1:'+str(server.server_port)
+        changes,usage=organizer.complete((base+'/v1','small-model','test-key'),[{'role':'user','content':'test'}],128)
+        assert changes=={'mood':'快乐'} and usage['total_tokens']==20
+        assert requests[0][0]=='/v1/chat/completions'
+        assert requests[0][1]=='Bearer test-key'
+        assert requests[0][2]['model']=='small-model' and requests[0][2]['max_tokens']==128
+        from fastapi import HTTPException
+        with pytest.raises(HTTPException) as error:
+            organizer.complete((base+'/redirect','small-model','do-not-leak'),[],128)
+        assert 'do-not-leak' not in str(error.value.detail)
+        assert len(requests)==2
+    finally:
+        server.shutdown();server.server_close();thread.join()
+
+
+def test_organizer_six_modules_validate_before_any_write(organizer_host, monkeypatch):
+    _, client, sdk, prefix, organizer, _, _, _ = organizer_host
+    if not sdk: return
+    config = client.get(prefix+'/organizer/config').json()['config']
+    for module in config['modules'].values():module['enabled']=True
+    assert client.put(prefix+'/organizer/config',json=config).status_code==200
+    outputs=[{'mood':'开心'}, {'date':'2026-10-15','plan':[{'time':'09:30','activity':'读书'}]},
+             [{'date':'2026-10-15','content':'梦见了森林'}], [{'content':'记得喝水'}],
+             {'warmth_score':70,'milestones':[{'date':'2026-10-15','event':'一起聊天'}]},
+             [{'name':'纪念日','date':'2026-10-15'}]]
+    before=organizer.snapshot()
+    broken=iter(outputs[:-1]+[[{'name':'坏日期','date':'2026-02-30'}]])
+    monkeypatch.setattr(organizer,'complete',lambda *args:(next(broken),{'total_tokens':10}))
+    body={'agent_id':'alice','chat_id':'chat-a'}
+    assert client.post(prefix+'/organizer/preview',json=body).status_code==422
+    assert organizer.snapshot()==before
+    correct=iter(outputs)
+    monkeypatch.setattr(organizer,'complete',lambda *args:(next(correct),{'total_tokens':10}))
+    result=client.post(prefix+'/organizer/preview',json=body)
+    assert result.status_code==200,result.text
+    preview=result.json()
+    assert preview['requests']==6 and len(preview['changes'])==6
+    assert organizer.snapshot()==before
+    applied=client.post(prefix+'/organizer/apply',json={'preview_id':preview['preview_id']})
+    assert applied.status_code==200,applied.text
+    after=organizer.snapshot()
+    assert after['state']['mood']=='开心'
+    assert after['schedule']['plan'][0]['activity']=='读书'
+    assert after['dreams'][0]['content']=='梦见了森林'
+    assert any(note['content']=='记得喝水' for note in after['notes'])
+    assert any(item['name']=='纪念日' for item in after['dates'])

@@ -7,7 +7,7 @@ import zipfile
 root = Path(__file__).resolve().parents[1]
 manifest = json.loads((root / 'plugin.json').read_text(encoding='utf-8'))
 version = manifest['version']
-required = ['plugin.py', 'plugin.json', 'requirements.txt', 'README.md',
+required = ['plugin.py', 'organizer.py', 'plugin.json', 'requirements.txt', 'README.md',
             'RELEASE.md', 'SKILL.md', 'CHANGELOG.md', 'LICENSE']
 for name in required + list(manifest['entry'].values()):
     file = root / name

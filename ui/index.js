@@ -1,7 +1,7 @@
 /**
  * Companion Core — frontend dashboard.
  *
- * 7 tabs: State, Schedule, Dreams, Notes, Relationship, Dates, Data.
+ * Companion data, agent binding and independent-model chat organization.
  * Dark mode via host.useTheme(); API calls go through host.getApiUrl().
  */
 (function () {
@@ -44,6 +44,12 @@
 
   var MESSAGES = {
     zh: {
+      tabOrganizer:"聊天整理", orgIntro:"使用独立的小模型整理近期聊天，不占用主聊天模型。近期文字会发送至你配置的 API。每个启用模块最多调用一次，六个模块最多六次；实际费用按服务商计费。",
+      orgBase:"API 基址（例如 https://example.com/v1）", orgModel:"模型名称", orgKey:"API Key（留空保留已保存密钥）", orgKeySaved:"已保存密钥", orgKeyEmpty:"未设置密钥（支持免密本地接口）", orgKeyClear:"清除已保存密钥", orgInherit:"留空继承公共设置；不同 API 地址不继承公共密钥",
+      orgAgent:"整理目标智能体", orgChooseAgent:"选择已绑定的智能体", orgChat:"近期会话", orgChooseChat:"选择一个会话", orgAuto:"聊天结束自动整理", orgAutoHint:"自动整理默认关闭。开启后仅处理目标智能体，在聊天结束后按最小间隔运行，无新内容则跳过；会自动写入数据并保留最近 10 份轮换备份。",
+      orgNoAuto:"此宿主不支持自动整理钩子，可手动整理。", orgInterval:"最小间隔（分钟）", orgMessages:"最多读取消息数", orgChars:"聊天文字上限（字符）", orgTokens:"每个模块最大输出 token", orgEnabled:"启用此模块", orgPrompt:"模块整理规则 / 提示词", orgSchema:"数据定义（固定结构，点击查看）",
+      orgSave:"保存整理配置", orgRefresh:"刷新配置与状态", orgSaved:"配置已保存", orgPreview:"整理并预览（会消耗模型额度）", orgApply:"确认写入这些修改", orgDiscard:"放弃预览", orgNoChanges:"模型未提出数据修改。", orgPreviewHint:"本次只生成预览，尚未写入。预览有效期 10 分钟；期间数据变化会阻止覆盖。",
+      orgApplied:"修改已写入，其他模块页面已刷新。", orgBefore:"修改前", orgAfter:"修改后", orgUsage:"本次模型用量（服务商未返回时显示空对象）", orgStatus:"最近整理状态", orgDirty:"有未保存设置，请先保存再整理。", orgRead:"读取消息", orgRequests:"模型请求数", orgLoadingChats:"未选择会话或该智能体暂无可读取会话。", orgShared:"六个模块分别使用自己的提示词和模型；API、模型留空时使用公共设置。各智能体仍共享陪伴数据。",
       tabAgents: "智能体绑定", agentsHint: "绑定会在宿主配置中启用该智能体的 7 个陪伴工具。数据仍由本插件共享；绑定不代表模型已经调用。",
       agentBind: "绑定并启用工具", agentUnbind: "解除绑定", agentBound: "已绑定", agentPartial: "部分启用", agentUnbound: "未绑定", agentUnknown: "配置读取失败",
       agentDisabled: "智能体已停用", agentNoCalls: "尚未观察到调用（仅记录本次插件运行期间）", agentLastCall: "最近实际调用", agentSuccess: "成功", agentError: "失败",
@@ -99,6 +105,12 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
+      tabOrganizer:"Chat organizer", orgIntro:"Use an independent small model to organize recent chats. Recent text is sent to your configured API. Each enabled module makes at most one request, up to six per run. Provider pricing applies.",
+      orgBase:"API base URL (e.g. https://example.com/v1)", orgModel:"Model name", orgKey:"API key (blank keeps the saved key)", orgKeySaved:"Key saved", orgKeyEmpty:"No key (local keyless endpoints supported)", orgKeyClear:"Clear saved key", orgInherit:"Blank inherits shared settings. A different endpoint does not inherit the shared key.",
+      orgAgent:"Target agent", orgChooseAgent:"Choose a bound agent", orgChat:"Recent conversation", orgChooseChat:"Choose a conversation", orgAuto:"Organize after chats automatically", orgAutoHint:"Off by default. Runs after the selected agent finishes a chat, subject to the minimum interval; unchanged text is skipped. Changes are applied automatically, retaining 10 rotating backups.",
+      orgNoAuto:"This host has no automatic hook; manual organization is available.", orgInterval:"Minimum interval (minutes)", orgMessages:"Maximum recent messages", orgChars:"Maximum chat characters", orgTokens:"Maximum output tokens per module", orgEnabled:"Enable module", orgPrompt:"Module rules / prompt", orgSchema:"Data schema (fixed structure)",
+      orgSave:"Save organizer settings", orgRefresh:"Refresh settings and status", orgSaved:"Settings saved", orgPreview:"Generate preview (uses model credits)", orgApply:"Apply these changes", orgDiscard:"Discard preview", orgNoChanges:"The model proposed no changes.", orgPreviewHint:"Preview only; nothing written yet. Expires in 10 minutes. Concurrent edits block overwriting.",
+      orgApplied:"Changes applied. Other module pages refreshed.", orgBefore:"Before", orgAfter:"After", orgUsage:"Model usage (empty if the provider omitted it)", orgStatus:"Latest organizer status", orgDirty:"Unsaved settings. Save before organizing.", orgRead:"Messages read", orgRequests:"Model requests", orgLoadingChats:"No conversation selected or no readable conversations.", orgShared:"Each module has its own prompt and optional model/API overrides. Blank settings inherit the shared defaults. Companion data is shared across agents.",
       tabAgents: "Agent binding", agentsHint: "Binding enables the seven companion tools in the host agent configuration. Companion data remains shared; binding does not prove model usage.",
       agentBind: "Bind and enable tools", agentUnbind: "Unbind", agentBound: "Bound", agentPartial: "Partially enabled", agentUnbound: "Unbound", agentUnknown: "Cannot read configuration",
       agentDisabled: "Agent disabled", agentNoCalls: "No observed calls in this plugin run", agentLastCall: "Last actual call", agentSuccess: "Success", agentError: "Failed",
@@ -319,6 +331,11 @@
     deleteDate: function (n) { return apiFetch("/companion-core/dates/" + encodeURIComponent(n), { method: "DELETE" }); },
     exportAll: function () { return apiFetch("/companion-core/export"); },
     importAll: function (d) { return apiFetch("/companion-core/import", { method: "POST", body: d }); },
+    organizerConfig: function () { return apiFetch("/companion-core/organizer/config"); },
+    saveOrganizer: function (data) { return apiFetch("/companion-core/organizer/config", {method:"PUT",body:data}); },
+    organizerChats: function (id) { return apiFetch("/companion-core/organizer/chats?agent_id=" + encodeURIComponent(id)); },
+    organizerPreview: function (agent,chat) { return apiFetch("/companion-core/organizer/preview", {method:"POST",body:{agent_id:agent,chat_id:chat}}); },
+    organizerApply: function (id) { return apiFetch("/companion-core/organizer/apply", {method:"POST",body:{preview_id:id}}); },
     agents: function () { return apiFetch("/companion-core/agents"); },
     bindAgent: function (id, enabled) { return apiFetch("/companion-core/agents/" + encodeURIComponent(id) + "/binding", {method:"PUT", body:{enabled:enabled}}); },
     health: function () { return apiFetch("/companion-core/health"); },
@@ -870,6 +887,84 @@
 
   // ── Tab: Data (export / import) ──────────────────────────────────────
 
+  function OrganizerTab(props) {
+    var t=props.t, C=props.C;
+    var s=useAsync(function(){return Promise.all([api.organizerConfig(),api.agents()]);},[]);
+    var f=useState(null),form=f[0],setForm=f[1];
+    var d=useState(false),dirty=d[0],setDirty=d[1];
+    var b=useState(false),busy=b[0],setBusy=b[1];
+    var cs=useState([]),chats=cs[0],setChats=cs[1];
+    var ci=useState(""),chat=ci[0],setChat=ci[1];
+    var ps=useState(null),preview=ps[0],setPreview=ps[1];
+    var ns=useState(""),notice=ns[0],setNotice=ns[1];
+    useEffect(function(){if(s.data){setForm(s.data[0].config);setDirty(false);}},[s.data]);
+    var agentId=form ? form.agent_id : "";
+    useEffect(function(){
+      var alive=true;setChats([]);setChat("");
+      if(agentId) api.organizerChats(agentId).then(function(data){if(alive)setChats(data.chats);})
+        .catch(function(error){if(alive)setNotice(error.message);});
+      return function(){alive=false;};
+    },[agentId]);
+    function update(key,value,module){
+      setForm(function(old){var next=Object.assign({},old);if(module){next.modules=Object.assign({},old.modules);next.modules[module]=Object.assign({},old.modules[module]);next.modules[module][key]=value;}else next[key]=value;return next;});
+      setDirty(true);setPreview(null);
+    }
+    function run(action){if(busy)return;setBusy(true);setNotice("");action().catch(function(error){setNotice(error.message);}).then(function(){setBusy(false);});}
+    function save(){run(function(){return api.saveOrganizer(form).then(function(data){setForm(data.config);setDirty(false);setPreview(null);setNotice(t("orgSaved"));});});}
+    function generate(){setPreview(null);run(function(){return api.organizerPreview(agentId,chat).then(setPreview);});}
+    function apply(){run(function(){return api.organizerApply(preview.preview_id).then(function(){setPreview(null);setNotice(t("orgApplied"));if(props.onApplied)props.onApplied();});});}
+    function field(label,child){return h("div",{style:{marginBottom:14}},h(EditorRow,{label:label,C:C},child));}
+    function provider(value,module){return h("div",{},
+      field(t("orgBase"),h(Input,{"aria-label":t("orgBase")+" "+(module||"default"),value:value.base_url,disabled:busy,onChange:function(e){update("base_url",e.target.value,module);}})),
+      field(t("orgModel"),h(Input,{"aria-label":t("orgModel")+" "+(module||"default"),value:value.model,disabled:busy,onChange:function(e){update("model",e.target.value,module);}})),
+      field(t("orgKey"),h(Input,{"aria-label":t("orgKey")+" "+(module||"default"),type:"password",autoComplete:"new-password",value:value.api_key,disabled:busy,onChange:function(e){update("api_key",e.target.value,module);}})),
+      h("p",{style:{color:C.sub}},t(value.api_key_configured?"orgKeySaved":"orgKeyEmpty")),
+      value.api_key_configured ? field(t("orgKeyClear"),h(Switch,{checked:!!value.clear_api_key,disabled:busy,onChange:function(v){update("clear_api_key",v,module);}})) : null);
+    }
+    function number(label,key,min,max){return field(t(label),h(InputNumber,{min:min,max:max,value:form[key],disabled:busy,onChange:function(value){if(value!==null)update(key,value);}}));}
+    var labels={state:"tabState",schedule:"tabSchedule",dreams:"tabDreams",notes:"tabNotes",relationship:"tabRelationship",dates:"tabDates"};
+    var selectStyle={width:"100%",padding:10,borderRadius:8,background:C.cardBg,color:C.text,border:"1px solid #aaa"};
+    if(s.loading || !form && !s.error)return h(LoadingBlock,{t:t,C:C});
+    if(s.error)return h(ErrorBlock,{t:t,C:C,error:s.error,onRetry:s.retry});
+    var meta=s.data[0], agents=s.data[1].agents || [];
+    return h("section",{style:panelStyle(C)},
+      h(Toolbar,{left:h("strong",null,t("tabOrganizer")),right:h(Button,{disabled:busy,onClick:s.retry},t("orgRefresh"))}),
+      h(SectionIntro,{C:C},t("orgIntro")),
+      notice?h("p",{role:"status",style:{color:C.accent,whiteSpace:"pre-wrap"}},notice):null,
+      provider(form),
+      field(t("orgAgent"),h("select",{value:agentId,disabled:busy,style:selectStyle,"aria-label":t("orgAgent"),onChange:function(e){update("agent_id",e.target.value);}},
+        h("option",{value:""},t("orgChooseAgent")),agents.filter(function(a){return a.enabled_tools && a.enabled_tools.length && a.agent_enabled!==false;}).map(function(a){return h("option",{key:a.id,value:a.id},a.name+" ("+a.id+")");}))),
+      field(t("orgChat"),h("select",{value:chat,disabled:busy,style:selectStyle,"aria-label":t("orgChat"),onChange:function(e){setChat(e.target.value);setPreview(null);}},
+        h("option",{value:""},t("orgChooseChat")),chats.map(function(item){return h("option",{key:item.id,value:item.id},item.name+" · "+item.updated_at);}))),
+      number("orgMessages","recent_messages",2,200),number("orgChars","max_context_chars",1000,64000),number("orgTokens","max_output_tokens",128,4096),
+      field(t("orgAuto"),h(Switch,{checked:form.auto_enabled,disabled:busy||!meta.auto_supported,onChange:function(v){update("auto_enabled",v);}})),
+      h("p",{style:{color:C.sub,lineHeight:1.8}},t("orgAutoHint")),
+      !meta.auto_supported?h("p",null,t("orgNoAuto")):null,
+      number("orgInterval","interval_minutes",5,1440),
+      h("p",{style:{color:C.sub}},t("orgShared")),
+      Object.keys(labels).map(function(key){var module=form.modules[key];return h("details",{key:key,style:{border:C.border,padding:16,borderRadius:12,marginBottom:12}},
+        h("summary",{style:{cursor:"pointer",fontWeight:600}},t(labels[key])+" · "+(module.model || form.model || "—")),
+        h("div",{style:{paddingTop:16}},field(t("orgEnabled"),h(Switch,{checked:module.enabled,disabled:busy,onChange:function(v){update("enabled",v,key);}})),
+          h("p",{style:{color:C.sub}},t("orgInherit")),provider(module,key),
+          field(t("orgPrompt"),h(TextArea,{rows:4,value:module.prompt,disabled:busy,onChange:function(e){update("prompt",e.target.value,key);}})),
+          h("details",{},h("summary",{style:{cursor:"pointer"}},t("orgSchema")),h("pre",{style:{maxHeight:300,overflow:"auto",whiteSpace:"pre-wrap",overflowWrap:"anywhere",fontSize:12}},JSON.stringify(meta.definitions[key],null,2)))));}),
+      dirty?h("p",null,t("orgDirty")):null,
+      h("div",{style:{display:"flex",gap:10,flexWrap:"wrap",marginTop:20}},
+        h(Button,{type:"primary",disabled:busy,onClick:save},t("orgSave")),
+        h(Button,{loading:busy,disabled:busy||dirty||!agentId||!chat,onClick:generate},t("orgPreview"))),
+      preview?h("div",{style:{marginTop:24}},
+        h("p",null,t("orgRead")+": "+preview.message_count+" · "+t("orgRequests")+": "+preview.requests),
+        h("p",null,t("orgPreviewHint")),
+        Object.keys(preview.changes).length?Object.keys(preview.changes).map(function(key){return h("details",{key:key,open:true,style:{marginBottom:16}},h("summary",null,t(labels[key])),
+          h("strong",null,t("orgBefore")),h("pre",{style:{whiteSpace:"pre-wrap",overflowWrap:"anywhere",maxHeight:250,overflow:"auto"}},JSON.stringify(preview.changes[key].before,null,2)),
+          h("strong",null,t("orgAfter")),h("pre",{style:{whiteSpace:"pre-wrap",overflowWrap:"anywhere",maxHeight:250,overflow:"auto"}},JSON.stringify(preview.changes[key].after,null,2)));}):h("p",null,t("orgNoChanges")),
+        h("p",null,t("orgUsage")),h("pre",{style:{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}},JSON.stringify(preview.usage,null,2)),
+        h("div",{style:{display:"flex",gap:10,flexWrap:"wrap"}},
+          h(Button,{type:"primary",disabled:busy||!Object.keys(preview.changes).length,onClick:apply},t("orgApply")),
+          h(Button,{disabled:busy,onClick:function(){setPreview(null);}},t("orgDiscard")))):null,
+      h("details",{style:{marginTop:24}},h("summary",null,t("orgStatus")),h("pre",{style:{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}},JSON.stringify(meta.status,null,2))));
+  }
+
   function AgentsTab(props) {
     var t = props.t, C = props.C;
     var s = useAsync(api.agents, []);
@@ -1059,6 +1154,7 @@
           { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { key:revision, t: t, C: C }) },
           { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { key:revision, t: t, C: C }) },
           { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C }) },
+          { key: "organizer", label: "✨ " + t("tabOrganizer"), children: h(OrganizerTab, { t:t, C:C, onApplied:function(){setRevision(function(v){return v+1;});} }) },
           { key: "agents", label: "🤖 " + t("tabAgents"), children: h(AgentsTab, { t:t, C:C }) },
           { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
         ],
