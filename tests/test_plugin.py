@@ -55,7 +55,12 @@ def test_load_and_preserve_existing_data(loaded):
     health = client.get(prefix + '/health').json()
     assert health['version'] == json.loads((ROOT / 'plugin.json').read_text())['version']
     assert health['agent_tools'] is sdk
+    expected_tools = list(module.TOOL_NAMES) if sdk else []
+    assert health['tool_names'] == expected_tools
+    assert health['tool_count'] == len(expected_tools)
+    assert health['data_dir'] == str(data)
     if sdk:
+        assert sorted(module.app.tools) == sorted(expected_tools)
         assert len(module.app.tools) == 7
     assert client.put(prefix + '/state', json={'mood': '测试心情', 'energy': 42}).status_code == 200
     module._seed_data()

@@ -45,10 +45,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.7.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.7.1.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.7.0.zip
+qwenpaw plugin install /path/to/companion-core-2.7.1.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -174,17 +174,21 @@ companion-core/
 
 首次加载会自动补全缺失的种子文件，不覆盖已有文件。可通过 `/api/companion-core/export` 导出备份，`/api/companion-core/import` 恢复。
 
+### 已安装实例与容器迁移
+
+默认目录按插件进程的 `Path.home()` 解析，与 `WORKING_DIR` 无关：以 root 运行时通常是 `/root/.qwenpaw/data/companion-core/`。访问 `/health` 查看 `version`、`data_dir`、`agent_tools`、`tool_names` 和 `tool_count`；SDK 模式本版本声明 7 个工具，标准 router 模式为 0。健康接口只反映插件模式与工具清单，不证明某个智能体绑定或模型调用成功。若宿主显示 8 个工具，请核对完整名称、加载版本和是否重复加载插件。
+
+升级保留已有记录。旧版示例与真实数据无法可靠自动区分，因此不会自动删除。需要清理时先备份，再由用户确认具体记录并在仪表盘编辑。
+
+容器销毁前应备份**整个实际数据目录**，并将该目录持久化挂载；或为插件进程设置 `QWENPAW_COMPANION_DATA` 为已持久化的绝对路径。修改环境变量不会搬迁旧数据：暂停插件写入，完整复制旧目录并保留权限，设置变量后重启或重新加载插件，再核对 `/health` 路径及原记录。验证通过前保留旧目录以便回退；不要为迁移覆盖已有目标数据。
+
+完整目录还包括 `setup.json`（引导状态）、`organizer-settings.json`（模型配置及密钥，须保留 0600 权限）和 `organizer-backups/`。仪表盘导出只备份陪伴记录，**不包含引导状态或模型配置与密钥**；完整迁移须额外备份这些文件。包含密钥的目录备份应私密保存，不提交 Git 或公开传输。
+
 ## 🎨 自定义指南
 
-### 1. 替换占位符
+### 1. 称呼与技能
 
-在 `SKILL.md` 中搜索以下占位符并替换：
-
-| 占位符 | 说明 | 示例 |
-|--------|------|------|
-| `{{AGENT_NAME}}` | Agent 名称 | 小爱、月欣羽 |
-| `{{USER_NAME}}` | 用户名称 | 小明 |
-| `{{USER_NICKNAME}}` | 用户昵称 | 宝宝、宝贝 |
+技能模板沿用对话中已确认的称呼，无需替换占位符。首次使用引导中的称呼仅用于仪表盘显示。技能不自动创建定时任务，也不将格式示例写为真实数据。
 
 ### 2. 修改数据模板
 

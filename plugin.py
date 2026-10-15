@@ -679,6 +679,8 @@ def health():
         "status": "ok",
         "version": PLUGIN_VERSION,
         "agent_tools": app is not None,
+        "tool_names": list(TOOL_NAMES) if app is not None else [],
+        "tool_count": len(TOOL_NAMES) if app is not None else 0,
         "data_dir": str(_DATA_DIR),
         "dreams_count": len(list(dreams_dir.glob("*.md")))
         if dreams_dir.exists()

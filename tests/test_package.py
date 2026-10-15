@@ -18,3 +18,14 @@ def test_package_metadata_and_license(tmp_path):
             assert archive.read('companion-core/' + name)
         assert b'MIT License' in archive.read('companion-core/LICENSE')
         assert json.loads(archive.read('companion-core/plugin.json'))['license'] == 'MIT'
+
+
+def test_packaged_skill_matches_manifest(tmp_path):
+    subprocess.run([sys.executable, str(ROOT / 'scripts/package.py'), str(tmp_path)], check=True)
+    manifest = json.loads((ROOT / 'plugin.json').read_text(encoding='utf-8'))
+    with zipfile.ZipFile(tmp_path / f"companion-core-{manifest['version']}.zip") as archive:
+        skill = archive.read('companion-core/SKILL.md').decode('utf-8')
+        assert f"version: {manifest['version']}\n" in skill
+        assert f"（v{manifest['version']}）" in skill
+        for placeholder in ['{{AGENT_NAME}}', '{{USER_NAME}}', '{{USER_NICKNAME}}']:
+            assert placeholder not in skill
