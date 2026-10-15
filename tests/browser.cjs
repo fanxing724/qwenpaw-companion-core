@@ -1,6 +1,7 @@
 const {chromium}=require('playwright');
 const fs=require('fs'),http=require('http'),path=require('path'),assert=require('assert/strict');
 const repo=path.resolve(__dirname,'..');
+const pluginVersion=JSON.parse(fs.readFileSync(path.join(repo,'plugin.json'),'utf8')).version;
 const output=process.env.COMPANION_PREVIEW_DIR || path.join(require('os').tmpdir(),'companion-core-preview');
 fs.mkdirSync(output,{recursive:true});
 const modules=path.dirname(path.dirname(require.resolve('react/package.json')));
@@ -39,7 +40,7 @@ const server=http.createServer(async(req,res)=>{
    if(endpoint.startsWith('notes/'))Object.assign(db.notes.find(n=>n.id===endpoint.split('/')[1]),payload);
    else Object.assign(db[endpoint],payload);
   }
-  let value=endpoint==='health'?{version:'2.4.0',status:'ok',notes_count:2,dreams_count:1}:endpoint.startsWith('dreams/')?db.dreams[0]:db[endpoint];
+  let value=endpoint==='health'?{version:pluginVersion,status:'ok',notes_count:2,dreams_count:1}:endpoint.startsWith('dreams/')?db.dreams[0]:db[endpoint];
   res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value||{}));return;
  }
  if(req.url==='/plugin.js'){res.setHeader('Content-Type','application/javascript');res.end(fs.readFileSync(repo+'/ui/index.js'));return;}
@@ -54,6 +55,17 @@ const server=http.createServer(async(req,res)=>{
  try{
   await page.goto(url);await page.getByText('平静而充实',{exact:true}).waitFor();
   await page.screenshot({path:path.join(output,'overview-desktop.png'),fullPage:true});
+  const projectUrl='https://github.com/fanxing724/qwenpaw-companion-core';
+  const githubLink=page.getByRole('link',{name:'GitHub',exact:true});
+  assert.equal(await githubLink.getAttribute('href'),projectUrl);
+  assert.equal(await githubLink.getAttribute('target'),'_blank');
+  assert.equal(await githubLink.getAttribute('rel'),'noopener noreferrer');
+  await page.getByRole('button',{name:/关\s*于/}).click();
+  await page.getByText('由番星与 GPT 联合制作',{exact:true}).waitFor();
+  await page.getByText('当前版本: v'+pluginVersion,{exact:true}).waitFor();
+  assert.equal(await page.getByRole('link',{name:'版本与下载',exact:true}).getAttribute('href'),projectUrl+'/releases');
+  assert.equal(await page.getByRole('link',{name:'反馈问题',exact:true}).getAttribute('href'),projectUrl+'/issues');
+  await page.screenshot({path:path.join(output,'about-desktop.png'),fullPage:true});
   await page.getByRole('tab',{name:'日程'}).click();
   await page.getByRole('button',{name:'编辑',exact:true}).first().click();
   const modal=page.getByRole('dialog');await modal.locator('input').nth(1).fill('读书后去散步');await modal.getByRole('button',{name:/保\s*存/}).click();
@@ -99,7 +111,7 @@ const server=http.createServer(async(req,res)=>{
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
   await page.screenshot({path:path.join(output,'overview-mobile.png'),fullPage:true});
   // Check row-heavy screens on a narrow viewport too.
-  for(const name of ['日程','便签','重要日期','智能体绑定','AI 设置']){await page.getByRole('tab',{name}).click();await page.waitForTimeout(200);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overflow in '+name);}
+  for(const name of ['日程','便签','重要日期','智能体绑定','AI 设置','关于']){await page.getByRole('tab',{name}).click();await page.waitForTimeout(200);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overflow in '+name);}
   await page.setViewportSize({width:1280,height:1000});await page.goto(url+'?dark');await page.getByText('平静而充实',{exact:true}).waitFor();await page.screenshot({path:path.join(output,'overview-dark.png'),fullPage:true});
   const beforeSetup=JSON.stringify([db.state,db.schedule,db.notes,db.relationship,db.dates,db.dreams]);
   db.setup={completed:false,profile:{user_name:'',companion_name:''},has_existing_data:true};
@@ -112,7 +124,7 @@ const server=http.createServer(async(req,res)=>{
   await wizard.getByRole('button',{name:'绑定并继续',exact:true}).click();
   await wizard.getByText('配置 AI 模型',{exact:true}).waitFor();
   await page.screenshot({path:path.join(output,'setup-model.png'),fullPage:true});
-  await wizard.getByRole('button',{name:'完成设置',exact:true}).click();
+  await page.getByText('完成设置',{exact:true}).click();
   await wizard.waitFor({state:'hidden'});assert.equal(db.setup.completed,true);assert.equal(db.setup.profile.user_name,'小星');
   assert.equal(JSON.stringify([db.state,db.schedule,db.notes,db.relationship,db.dates,db.dreams]),beforeSetup);
   assert.equal(organizerPreviewCalls,1,'setup makes no model calls');
@@ -120,11 +132,13 @@ const server=http.createServer(async(req,res)=>{
   await page.getByRole('button',{name:'使用引导',exact:true}).click();await page.getByRole('dialog').waitFor();
   await page.getByRole('dialog').getByRole('button',{name:'稍后设置',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
   await page.goto(url+'?en');await page.getByRole('tab',{name:'Overview'}).waitFor();await page.getByText('Current mood',{exact:true}).waitFor();
+  await page.getByRole('tab',{name:'About'}).click();
+  await page.getByText('Jointly created by 番星 and GPT',{exact:true}).waitFor();
   await page.getByRole('tab',{name:'Agent binding'}).click();
   await page.getByRole('button',{name:'Bind and enable tools'}).waitFor();
   db.agents={supported:false,reason:'宿主未注册 AI 工具',agents:[]};
   await page.getByRole('button',{name:'Refresh status'}).click();
   await page.getByText('宿主未注册 AI 工具',{exact:true}).waitFor();
-  assert.deepEqual(errors,[]);console.log('Browser passed: overview, schedule edit, note edit/search, 390px layouts, dark theme, English, AI settings save/preview/apply, onboarding and preservation, agent bind/unbind/status and unsupported host; no page errors');
+  assert.deepEqual(errors,[]);console.log('Browser passed: GitHub and About links, credits, localized About page, overview, schedule edit, note edit/search, 390px layouts, dark theme, English, AI settings save/preview/apply, onboarding and preservation, agent bind/unbind/status and unsupported host; no page errors');
  }catch(error){console.error('Browser page errors:',errors);await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});throw error;}finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

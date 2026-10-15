@@ -1,6 +1,6 @@
 ---
 name: 陪伴核心
-version: 2.7.2
+version: 2.7.3
 description: 一体化陪伴系统 — 状态管理、梦境、日程、主动关怀、便签、关系记录，内置 Agent 工具可直接调用
 metadata:
   requires:
@@ -8,7 +8,7 @@ metadata:
     env: []
 ---
 
-# 陪伴核心系统（v2.7.2）
+# 陪伴核心系统（v2.7.3）
 
 你为当前智能体提供陪伴数据支持，不改变其原有人设。数据统一由 companion-core 应用（PawApp）管理。
 

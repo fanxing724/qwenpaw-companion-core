@@ -7,6 +7,8 @@
 
 基于 QwenPaw 2.x 插件接口开发的一体化陪伴系统，为 QwenPaw Agent 提供状态管理、梦境记录、日程安排、便签提醒、关系记录和重要日期管理，并附带可视化仪表盘。
 
+由 **番星与 GPT 联合制作**。插件面板顶部可打开 GitHub，或进入「关于」查看版本、下载入口、问题反馈与开源协议。
+
 ## 🙏 致谢
 
 本项目灵感与功能设计来源于 [astrbot_plugin_private_companion](https://github.com/menglimi/astrbot_plugin_private_companion)，针对 QwenPaw 平台进行了适配与重构。感谢原作者的贡献。
@@ -45,10 +47,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.7.2.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.7.3.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.7.2.zip
+qwenpaw plugin install /path/to/companion-core-2.7.3.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```

@@ -42,8 +42,13 @@
 
   // ── i18n ─────────────────────────────────────────────────────────────
 
+  var PROJECT_URL = "https://github.com/fanxing724/qwenpaw-companion-core";
+
   var MESSAGES = {
     zh: {
+      tabAbout:"关于", aboutCredit:"由番星与 GPT 联合制作", aboutIntro:"为 QwenPaw 提供状态、日程、梦境、便签、关系与重要日期管理。",
+      aboutVersion:"当前版本", aboutRepo:"GitHub 源码", aboutReleases:"版本与下载", aboutIssues:"反馈问题", aboutLicense:"MIT 开源协议", aboutThanks:"灵感与功能设计来源于 astrbot_plugin_private_companion，感谢原作者的贡献。",
+
       setupTitle:"开始你的陪伴记录", setupOpen:"使用引导", setupStep:"第 {step} 步，共 3 步", setupNames:"认识彼此", setupNamesHint:"称呼可以留空。记录从真实的聊天和生活开始。", setupUser:"你的称呼", setupCompanion:"陪伴对象的称呼", setupExisting:"已检测到已有记录。本引导只保存设置，会保留现有数据。", setupClean:"从空白记录开始：不预填心情、作息或关系分数。", setupAgent:"连接智能体", setupAgentHint:"选择一个智能体并启用陪伴工具，也可以稍后在“智能体绑定”中操作。", setupChoose:"暂不绑定", setupBindNext:"绑定并继续", setupModel:"配置 AI 模型", setupModelHint:"可填写一个便宜小模型，供各模块共用。也可跳过，之后在“AI 设置”中配置。保存本身不会调用模型，自动整理保持原来的开关状态。", setupNext:"下一步", setupBack:"上一步", setupLater:"稍后设置", setupFinish:"完成设置", setupMissingModel:"请同时填写 API 地址和模型名称，或选择稍后设置。", orgUseShared:"公共模型", noScore:"尚未记录",
       tabOrganizer:"AI 设置", orgIntro:"使用独立的小模型整理近期聊天，不占用主聊天模型。近期文字会发送至你配置的 API。每个启用模块最多调用一次，六个模块最多六次；实际费用按服务商计费。",
       orgBase:"API 基址（例如 https://example.com/v1）", orgModel:"模型名称", orgKey:"API Key（留空保留已保存密钥）", orgKeySaved:"已保存密钥", orgKeyEmpty:"未设置密钥（支持免密本地接口）", orgKeyClear:"清除已保存密钥", orgInherit:"留空继承公共设置；不同 API 地址不继承公共密钥",
@@ -106,6 +111,9 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
+      tabAbout:"About", aboutCredit:"Jointly created by 番星 and GPT", aboutIntro:"State, schedules, dreams, notes, relationships and important dates for QwenPaw.",
+      aboutVersion:"Current version", aboutRepo:"GitHub source", aboutReleases:"Releases & downloads", aboutIssues:"Report an issue", aboutLicense:"MIT License", aboutThanks:"Inspired by astrbot_plugin_private_companion. Thanks to its original author.",
+
       setupTitle:"Start your companion journal", setupOpen:"Getting started", setupStep:"Step {step} of 3", setupNames:"Get acquainted", setupNamesHint:"Names are optional. Start with real conversations and experiences.", setupUser:"Your name", setupCompanion:"Companion name", setupExisting:"Existing records found. This guide saves settings and preserves your data.", setupClean:"Start with empty records: no preset moods, routines or relationship scores.", setupAgent:"Connect an agent", setupAgentHint:"Enable companion tools for an agent, or do this later in Agent binding.", setupChoose:"Bind later", setupBindNext:"Bind and continue", setupModel:"Configure an AI model", setupModelHint:"Optionally share one inexpensive model across modules. You can configure it later in AI settings. Saving makes no model requests and preserves the existing automatic-update switch.", setupNext:"Next", setupBack:"Back", setupLater:"Set up later", setupFinish:"Finish setup", setupMissingModel:"Enter both API URL and model name, or choose Set up later.", orgUseShared:"Shared model", noScore:"Not recorded",
       tabOrganizer:"AI settings", orgIntro:"Use an independent small model to organize recent chats. Recent text is sent to your configured API. Each enabled module makes at most one request, up to six per run. Provider pricing applies.",
       orgBase:"API base URL (e.g. https://example.com/v1)", orgModel:"Model name", orgKey:"API key (blank keeps the saved key)", orgKeySaved:"Key saved", orgKeyEmpty:"No key (local keyless endpoints supported)", orgKeyClear:"Clear saved key", orgInherit:"Blank inherits shared settings. A different endpoint does not inherit the shared key.",
@@ -1165,8 +1173,29 @@
 @media(max-width:760px){.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap{overflow:visible}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.ant-tabs-nav .ant-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.ant-tabs-nav .ant-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-operations,.cc-tabs>.ant-tabs-nav .ant-tabs-ink-bar{display:none}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:before,.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:after{display:none}}
 @media(max-width:420px){.cc-metric{padding:16px 12px}.cc-metric strong{font-size:21px}.cc-metric-icon{right:12px;top:12px}.cc-hero{padding:20px}.cc-hero h1{font-size:24px}}
 @media(prefers-reduced-motion:reduce){.cc-metric{transition:none}}
+.cc-project-links{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.cc-today .cc-project-links{justify-content:flex-end}.cc-project-link{color:var(--cc-accent);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}.cc-project-link:focus-visible{outline:2px solid var(--cc-accent);outline-offset:4px}.cc-about{padding:24px;background:var(--cc-card);border-radius:16px;line-height:1.8;color:var(--cc-text)}.cc-about h2{margin-top:0}.cc-credit{font-weight:600}.cc-about nav{margin:20px 0}
 `;
   var APP_VERSION = "";
+
+  function ProjectLink(props) {
+    return h("a", {href:props.href, target:"_blank", rel:"noopener noreferrer", className:"cc-project-link"}, props.label);
+  }
+
+  function AboutTab(props) {
+    var t=props.t;
+    return h("section", {className:"cc-about"},
+      h("h2",null,t("appTitle")),
+      h("p",{className:"cc-credit"},t("aboutCredit")),
+      h("p",null,t("aboutIntro")),
+      h("p",null,t("aboutVersion")+": "+(props.version ? "v"+props.version : "—")),
+      h("nav",{"aria-label":t("tabAbout"),className:"cc-project-links"},
+        h(ProjectLink,{href:PROJECT_URL,label:t("aboutRepo")}),
+        h(ProjectLink,{href:PROJECT_URL+"/releases",label:t("aboutReleases")}),
+        h(ProjectLink,{href:PROJECT_URL+"/issues",label:t("aboutIssues")}),
+        h(ProjectLink,{href:PROJECT_URL+"/blob/main/LICENSE",label:t("aboutLicense")})),
+      h("p",null,t("aboutThanks")),
+      h(ProjectLink,{href:"https://github.com/menglimi/astrbot_plugin_private_companion",label:"astrbot_plugin_private_companion"}));
+  }
 
   function CompanionApp() {
     var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
@@ -1198,7 +1227,10 @@
         h("div",{className:"cc-hero-copy"}, h("div",{className:"cc-eyebrow"},"♡  " + t("todayLabel")),
           h("h1",null,t("appTitle"),h("span",{className:"cc-version"},version ? "v"+version : "")),
           h("p",null,setupData && setupData.profile && (setupData.profile.user_name || setupData.profile.companion_name)?[setupData.profile.companion_name,setupData.profile.user_name].filter(Boolean).join(" · "):t("welcome"))),
-        h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")),h(Button,{size:"small",style:{marginTop:12},onClick:function(){setSetupOpen(true);}},t("setupOpen")))),
+        h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")),h("div",{className:"cc-project-links",style:{marginTop:12}},
+          h(Button,{size:"small",onClick:function(){setSetupOpen(true);}},t("setupOpen")),
+          h(ProjectLink,{href:PROJECT_URL,label:"GitHub"}),
+          h(Button,{size:"small",onClick:function(){setActiveTab("about");}},t("tabAbout"))))),
       h(Tabs, {
         className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
         destroyInactiveTabPane:true,
@@ -1213,6 +1245,7 @@
           { key: "organizer", label: "✨ " + t("tabOrganizer"), children: h(OrganizerTab, { t:t, C:C, onApplied:function(){setRevision(function(v){return v+1;});} }) },
           { key: "agents", label: "🤖 " + t("tabAgents"), children: h(AgentsTab, { t:t, C:C }) },
           { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
+          { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },
         ],
       }));
   }
