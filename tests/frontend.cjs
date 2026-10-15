@@ -26,7 +26,7 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   const route = calls.find(c => c[0] === 'route')[1][0];
   assert.equal(route.id, 'companion-core.home');
   const tree = route.component();
-  assert.equal(tree.children.at(-1).props.items.length, 11);
+  assert.equal(tree.children.at(-1).props.items.length, 14);
   effects[0]();
   await new Promise(resolve => setImmediate(resolve));
   const base = mode === 'base-path' ? '/paw/api' : '/api';
@@ -38,16 +38,20 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   assert.equal(requests.at(-1), base + mount + '/companion-core/state', mode);
   assert.equal(requests.length, 4, 'one discovery probe and no mutation retries');
 }
-console.log('Frontend: 7 host modes, routes, eleven tabs and health API passed');
+console.log('Frontend: 7 host modes, routes, fourteen tabs and health API passed');
 
 // Evaluate date helpers in isolation without adding production globals.
 const helperContext = {window:{QwenPaw:{host:{React:{createElement(){}, useState(){}, useEffect(){}},antd:{Input:{}}}}},console};
-vm.runInNewContext(source.replace('  var APP_CSS = ', '  window.dateChecks = {isValidDate, daysUntilAnniversary};\n  var APP_CSS = '), helperContext);
+vm.runInNewContext(source.replace('  var APP_CSS = ', '  window.dateChecks = {isValidDate, daysUntilAnniversary, localToday, setTimezone:function(tz){BUSINESS_TIMEZONE=tz;}};\n  var APP_CSS = '), helperContext);
 const dates=helperContext.window.dateChecks;
 assert.equal(dates.isValidDate('2026-02-30'), false);
 assert.equal(dates.isValidDate('2028-02-29'), true);
 assert.equal(dates.isValidDate('2026-13-01'), false);
 assert.equal(dates.daysUntilAnniversary('invalid'), null);
-console.log('Date helpers: invalid calendar dates rejected, leap day accepted');
+const NativeDate=Date;
+helperContext.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:['2026-10-15T16:30:00Z']));}};
+dates.setTimezone('Asia/Shanghai');assert.equal(dates.localToday(),'2026-10-16');
+dates.setTimezone('UTC');assert.equal(dates.localToday(),'2026-10-15');
+console.log('Date helpers: calendar validation, leap day and business timezone midnight boundary passed');
 
 })().catch(error => {console.error(error); process.exitCode = 1;});

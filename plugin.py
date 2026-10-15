@@ -40,6 +40,7 @@ import logging
 import os
 import re
 import threading
+from contextlib import nullcontext
 from functools import wraps
 from uuid import uuid4
 from datetime import date, datetime
@@ -211,8 +212,32 @@ def _write_text(path: Path, content: str) -> None:
         tmp.unlink(missing_ok=True)
 
 
+def _archive_daily(kind: str, data: dict) -> None:
+    day = data.get("date", "")
+    try:
+        if not day:
+            return
+        _validate_date(day)
+    except (ValueError, TypeError):
+        return
+    path = _DATA_DIR / "history" / f"{day}.yaml"
+    if path.is_symlink() or path.parent.is_symlink():
+        raise HTTPException(409, "历史归档目录或文件不可为符号链接")
+    history = _read_yaml(path)
+    if history.get(kind) == data:
+        return
+    history[kind] = data
+    _write_text(path, yaml.safe_dump(history, allow_unicode=True, default_flow_style=False))
+
+
 def _write_yaml(path: Path, data: dict) -> None:
+    # Callers already serialize with _lock; all dashboard/tool/import/model paths use this writer.
+    kind = path.stem if path.parent == _DATA_DIR and path.name in {"state.yaml", "schedule.yaml"} else None
+    if kind:
+        _archive_daily(kind, _read_yaml(path))
     _write_text(path, yaml.safe_dump(data, allow_unicode=True, default_flow_style=False))
+    if kind:
+        _archive_daily(kind, data)
 
 
 def _read_json(path: Path) -> list | dict:
@@ -287,8 +312,12 @@ def _seed_data() -> None:
         else:
             _write_json(notes_path, [])
 
+    for kind in ("state", "schedule"):
+        _archive_daily(kind, _read_yaml(_DATA_DIR / f"{kind}.yaml"))
+
     # Only known plugin records: preserve contents and leave unrelated files alone.
     for path in [*(_DATA_DIR / "dreams").glob("*.md"),
+                 *(_DATA_DIR / "history").glob("*.yaml"),
                  *(_DATA_DIR / "organizer-backups").glob("*.json"),
                  *[_DATA_DIR / name for name in (*yaml_seeds, "notes.json", "setup.json", "organizer-settings.json", "organizer-status.json")]]:
         if path.is_file():
@@ -319,7 +348,7 @@ def update_state(state: StateModel):
         path = _DATA_DIR / "state.yaml"
         existing = _read_yaml(path)
         merged = {**existing, **state.model_dump(exclude_unset=True)}
-        merged["date"] = merged.get("date") or _today_str()
+        merged["date"] = state.date or _today_str()
         _write_yaml(path, merged)
     return merged
 
@@ -343,7 +372,7 @@ def update_schedule(schedule: ScheduleModel):
         path = _DATA_DIR / "schedule.yaml"
         existing = _read_yaml(path)
         merged = {**existing, **schedule.model_dump(exclude_unset=True)}
-        merged["date"] = merged.get("date") or _today_str()
+        merged["date"] = schedule.date or _today_str()
         _write_yaml(path, merged)
     return merged
 
@@ -463,16 +492,23 @@ def update_note(note_id: str, note: NoteModel):
     """更新便签（增量合并，如仅标记 reminded）。"""
     if "content" in note.model_fields_set and not note.content.strip():
         raise HTTPException(400, "便签内容不能为空")
-    with _lock:
-        notes = _read_notes()
-        for i, n in enumerate(notes):
-            if n.get("id") == note_id:
-                patch = note.model_dump(exclude_unset=True, exclude={"id"})
-                notes[i] = {**n, **patch, "id": note_id}
-                _write_json(_DATA_DIR / "notes.json", notes)
-                return NoteModel(**notes[i])
-    raise HTTPException(404, f"便签 {note_id} 不存在")
-
+    caretaker = globals().get("care")
+    with (caretaker.lock if caretaker is not None else nullcontext()):
+        with _lock:
+            notes = _read_notes()
+            for i, n in enumerate(notes):
+                if n.get("id") == note_id:
+                    patch = note.model_dump(exclude_unset=True, exclude={"id"})
+                    notes[i] = {**n, **patch, "id": note_id}
+                    _write_json(_DATA_DIR / "notes.json", notes)
+                    result = NoteModel(**notes[i])
+                    rearmed = "reminded" in patch and patch["reminded"] is False
+                    break
+            else:
+                raise HTTPException(404, f"便签 {note_id} 不存在")
+        if rearmed and caretaker is not None:
+            caretaker.note_rearmed(note_id)
+    return result
 
 @router.delete("/notes/{note_id}")
 def delete_note(note_id: str):
@@ -558,7 +594,7 @@ def delete_date(date_name: str):
 # ==================== 数据导出/导入 ====================
 
 @router.get("/export")
-def export_all_data():
+def export_all_data(include_history: bool = False):
     """导出所有数据（用于备份）。"""
     with _lock:
         dreams_dir = _DATA_DIR / "dreams"
@@ -571,7 +607,7 @@ def export_all_data():
                     content = ""
                 dreams.append({"date": f.stem, "content": content})
 
-        return {
+        result = {
             "state": _read_yaml(_DATA_DIR / "state.yaml"),
             "schedule": _read_yaml(_DATA_DIR / "schedule.yaml"),
             "dreams": dreams,
@@ -580,6 +616,11 @@ def export_all_data():
             "dates": _read_yaml(_DATA_DIR / "important_dates.yaml"),
             "exported_at": _now_ts(),
         }
+        if include_history:
+            if (_DATA_DIR / "history").is_symlink():
+                raise HTTPException(409,"历史目录不可为符号链接")
+            result["history"] = {path.stem: _read_yaml(path) for path in sorted((_DATA_DIR / "history").glob("*.yaml")) if not path.is_symlink()}
+        return result
 
 
 @router.post("/import")
@@ -591,7 +632,7 @@ def import_all_data(data: dict):
     # Reject malformed known sections before touching any user files.
     models = {"state": StateModel, "schedule": ScheduleModel,
               "relationship": RelationshipModel, "dates": ImportantDatesModel}
-    known = set(models) | {"notes", "dreams"}
+    known = set(models) | {"notes", "dreams", "history"}
     if not known.intersection(data):
         raise HTTPException(400, "备份不包含可恢复的数据")
     try:
@@ -609,6 +650,20 @@ def import_all_data(data: dict):
                 ids.append(note.id)
             if len(ids) != len(set(ids)):
                 raise ValueError("便签 id 重复")
+        if "history" in data:
+            if not isinstance(data["history"], dict) or len(data["history"]) > 10000:
+                raise ValueError("历史归档格式无效或超过上限")
+            for day, record in data["history"].items():
+                _validate_date(day)
+                if not day or not isinstance(record,dict) or set(record)-{"state","schedule"}:
+                    raise ValueError("历史归档包含未知字段")
+                target = _DATA_DIR / "history" / f"{day}.yaml"
+                if target.is_symlink() or target.parent.is_symlink():
+                    raise HTTPException(409,"历史目录不可为符号链接")
+                for kind, value in record.items():
+                    models[kind].model_validate(value)
+                    if value.get("date") != day:
+                        raise ValueError("历史记录日期不一致")
         if "dreams" in data:
             if not isinstance(data["dreams"], list):
                 raise ValueError("dreams 必须是列表")
@@ -620,6 +675,13 @@ def import_all_data(data: dict):
         raise HTTPException(400, f"备份格式无效: {exc}") from None
     imported = []
     with _lock:
+        if "history" in data:
+            for day, record in data["history"].items():
+                path = _DATA_DIR / "history" / f"{day}.yaml"
+                if path.is_symlink() or path.parent.is_symlink():
+                    raise HTTPException(409,"历史目录不可为符号链接")
+                _write_yaml(path, {**_read_yaml(path), **record})
+            imported.append("history")
         if "state" in data and isinstance(data["state"], dict):
             _write_yaml(_DATA_DIR / "state.yaml", data["state"])
             imported.append("state")
@@ -1085,20 +1147,7 @@ def _build_prompt(agent) -> str:
     active_notes = [n for n in notes if not _is_expired(n, today)]
     if active_notes:
         parts.append(f"\n当前有 {len(active_notes)} 条活跃便签。")
-    try:
-        dates_data = _read_yaml(_DATA_DIR / "important_dates.yaml")
-        dates_list = dates_data.get("dates", []) if dates_data else []
-        today_d = _now().date()
-        for d in dates_list:
-            dt_str = d.get("date", "")
-            try:
-                delta = _days_until_anniversary(dt_str[:10], today_d)
-                if 0 <= delta <= 7:
-                    parts.append(f"\n提醒：{d.get('name', '')}（{dt_str}）还有 {delta} 天。")
-            except Exception:  # noqa: BLE001
-                pass
-    except Exception:  # noqa: BLE001
-        pass
+    parts.append("主动事项提示由已启用的关怀首见钩子统一提供；不要仅凭便签数量反复主动问候。")
     return "\n".join(parts)
 
 
@@ -1109,15 +1158,8 @@ if app is not None:
 
 
 async def init_companion():
-    """Seed the data directory on app launch and clean up stale data."""
+    """Seed the data directory without deleting pending or overdue reminders."""
     await asyncio.to_thread(_seed_data)
-    with _lock:
-        notes = _read_notes()
-        today = _today_str()
-        valid = [n for n in notes if not _is_expired(n, today)]
-        if len(valid) < len(notes):
-            _write_json(_DATA_DIR / "notes.json", valid)
-            logger.info("[companion] Cleaned %d expired note(s) on startup", len(notes) - len(valid))
     logger.info("[companion] v%s loaded, data dir: %s", PLUGIN_VERSION, _DATA_DIR)
     logger.info(
         "[companion] API endpoints: /state, /schedule, /dreams, "
@@ -1177,6 +1219,16 @@ def complete_setup(payload: SetupProfile):
         })
     return get_setup()
 
+
+# Feature modules share the data lock and the host's existing lifecycle.
+for _feature_name in ("companion_features", "care"):
+    _spec = _importlib_util.spec_from_file_location("companion_"+_feature_name, _PLUGIN_DIR / (_feature_name+".py"))
+    _module = _importlib_util.module_from_spec(_spec)
+    _spec.loader.exec_module(_module)
+    if _feature_name == "companion_features":
+        features = _module.install(router, organizer)
+    else:
+        care = _module.install(router, organizer, features)
 
 # Standard router loaders do not invoke PawApp lifecycle hooks, even
 # when the optional SDK is installed. Initialize only missing files.

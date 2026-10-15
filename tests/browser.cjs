@@ -12,7 +12,10 @@ db.agents={supported:true,agents:[{id:'alice',name:'测试智能体',agent_enabl
 let bindingWrites=0;
 const organizerModules={};for(const key of ['state','schedule','dreams','notes','relationship','dates'])organizerModules[key]={enabled:key==='state',prompt:'仅整理明确事实',base_url:'',model:'',api_key:'',api_key_configured:false};
 db.organizer={config:{base_url:'',model:'',api_key:'',api_key_configured:false,auto_enabled:false,agent_id:'',interval_minutes:30,recent_messages:30,max_context_chars:12000,max_output_tokens:1200,modules:organizerModules},definitions:{state:{type:'object'},schedule:{type:'object'},dreams:{type:'array'},notes:{type:'array'},relationship:{type:'object'},dates:{type:'array'}},auto_supported:true,status:{state:'idle'}};
-let organizerPreviewCalls=0,organizerApplyCalls=0;
+let organizerPreviewCalls=0,organizerApplyCalls=0,careWrites=0;
+const careConfig={agent_id:'alice',enabled:false,first_seen:false,sync_enabled:false,morning:false,notes:true,anniversaries:true,inactivity:false,dream_enabled:false,model_greeting:false,style:'',time:'08:15',quiet_start:'23:00',quiet_end:'08:00',max_daily:1,inactivity_days:7,anniversary_lead:3,channel:'console',user_id:'',session_id:'',confirmed:false,review_id:''};
+const careQueue=[];
+
 const scriptFiles={'/react.js':'react/umd/react.development.js','/react-dom.js':'react-dom/umd/react-dom.development.js','/dayjs.js':'dayjs/dayjs.min.js','/antd.js':'antd/dist/antd.min.js','/reset.css':'antd/dist/reset.css'};
 const server=http.createServer(async(req,res)=>{
  if(req.url.startsWith('/api/companion-core/')){
@@ -20,6 +23,28 @@ const server=http.createServer(async(req,res)=>{
   if(endpoint==='setup'){
    if(req.method==='POST')db.setup={completed:true,profile:payload,has_existing_data:db.setup.has_existing_data};
    res.setHeader('Content-Type','application/json');res.end(JSON.stringify(db.setup));return;
+  }
+  const params=new URL(req.url,'http://localhost').searchParams;
+  if(endpoint==='timeline'){
+   const day=params.get('day')||today;
+   const value={agent_id:'alice',date:day,diary:'当天一起修复了插件 <script>window.timelineUnsafe=true</script>',dream:'【创作梦境】分号变成星星',state:day===today?db.state:null,schedule:day===today?db.schedule:null,countdown:[],dates:[today,'2025-10-15'],on_this_day:['2025-10-15'],milestones:db.relationship.milestones,shared_data_notice:'历史状态不补造',diary_notice:''};
+   res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value));return;
+  }
+  if(endpoint==='relationship/score-preview'||endpoint==='relationship/score-apply'){
+   const value=endpoint.endsWith('preview')?{preview_id:'score-1',proposed:35,current:db.relationship.warmth_score,parts:[{rule:'已确认里程碑',points:35,evidence:db.relationship.milestones}],notice:'本地计分，确认后写入'}:(db.relationship.warmth_score=35,{warmth_score:35});
+   res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value));return;
+  }
+  if(endpoint==='care'||endpoint.startsWith('care/')){
+   let value;
+   if(endpoint==='care'){
+    if(req.method==='PUT'){assert.equal(payload.review_id,'care-review');assert.equal(payload.confirmed,true);Object.assign(careConfig,payload);careWrites++;}
+    value={settings:careConfig,targets:[{channel:'console',user_id:'u',session_id:'s'}],queue:careQueue,status:'idle',hooks_supported:true,scheduler_supported:true,notice:'仅在确认后启用',memory_changes:[],model_plan:{available:false}};
+   }else if(endpoint==='care/preview')value={review_id:'care-review',rules:payload,model_plan:{available:false}};
+   else if(endpoint==='care/followup-preview')value={draft:'那天修复插件的事情，后来怎么样了？'};
+   else if(endpoint==='care/followup'){careQueue.push({id:'follow-1',text:payload.text,state:'pending'});value={state:'queued',notice:'跟进草稿已加入队列，尚未发送'};}
+   else if(endpoint==='care/stop'){careConfig.enabled=false;value={state:'disabled'};}
+   else if(endpoint==='care/ack'){careQueue.splice(0);value={state:'acknowledged'};}
+   res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value));return;
   }
   if(endpoint.startsWith('organizer/backfill/')){
    let value;
@@ -35,7 +60,8 @@ const server=http.createServer(async(req,res)=>{
    if(endpoint==='organizer/config'){
     if(req.method==='PUT'){db.organizer.config=payload;for(const provider of [payload,...Object.values(payload.modules)]){provider.api_key_configured=!!provider.api_key||provider.api_key_configured;provider.api_key='';}}
     value=db.organizer;
-   }else if(endpoint==='organizer/chats')value={chats:[{id:'chat-1',name:'最近的聊天',updated_at:'2026-10-15'}]};
+   }else if(endpoint==='organizer/discover-model')value={available:true,base_url:'http://localhost:9999/v1',model:'cheap-model',api_key:'',hint:'模型候选已预填，密钥未复制'};
+   else if(endpoint==='organizer/chats')value={chats:[{id:'chat-1',name:'最近的聊天',updated_at:'2026-10-15'}]};
    else if(endpoint==='organizer/preview'){organizerPreviewCalls++;value={preview_id:'preview-1',changes:{state:{before:{...db.state},after:{...db.state,mood:'整理后的心情'}}},message_count:10,chat_chars:300,requests:1,usage:[{module:'state',model:'cheap-model',usage:{total_tokens:150}}]};}
    else if(endpoint==='organizer/apply'){organizerApplyCalls++;db.state.mood='整理后的心情';value={state:'applied',modules:['state']};}
    res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value));return;
@@ -104,6 +130,9 @@ const server=http.createServer(async(req,res)=>{
   await page.getByRole('textbox',{name:'模型名称 default',exact:true}).fill('cheap-model');
   await page.getByLabel('API Key（留空保留已保存密钥） default',{exact:true}).fill('fake-test-key');
   await page.getByLabel('整理目标智能体',{exact:true}).selectOption('alice');
+  await page.getByRole('button',{name:'发现宿主模型（不复制密钥）',exact:true}).click();
+  await page.getByText('模型候选已预填，密钥未复制',{exact:true}).waitFor();
+  assert.equal(await page.getByLabel('API Key（留空保留已保存密钥） default',{exact:true}).inputValue(),'');
   await page.getByLabel('近期会话',{exact:true}).selectOption('chat-1');
   await page.getByRole('button',{name:'保存 AI 设置',exact:true}).click();
   await page.getByText('配置已保存',{exact:true}).waitFor();
@@ -136,11 +165,36 @@ const server=http.createServer(async(req,res)=>{
   await page.getByText('修改已写入，其他模块页面已刷新。',{exact:true}).waitFor();
   assert.equal(organizerApplyCalls,1);assert.equal(db.state.mood,'整理后的心情');
   db.state.mood='平静而充实';
+  await page.getByRole('tab',{name:'那一天'}).click();
+  await page.getByText('当天一起修复了插件 <script>window.timelineUnsafe=true</script>',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>window.timelineUnsafe),undefined);
+  await page.getByText('2025-10-15',{exact:true}).first().click();
+  await page.getByText('该日期暂无状态或日程历史；不会用今天的数据补填。',{exact:true}).first().waitFor();
+  await page.getByRole('button',{name:'生成本地跟进草稿',exact:true}).click();
+  await page.getByRole('textbox',{name:'问问现在怎么样',exact:true}).waitFor();
+  await page.getByRole('button',{name:'确认加入跟进队列',exact:true}).click();
+  await page.getByText('跟进草稿已加入队列，尚未发送',{exact:true}).waitFor();
+  assert.equal(careQueue.length,1);assert.equal(careWrites,0);
+  await page.getByRole('button',{name:'预览可解释亲密度',exact:true}).click();
+  await page.getByRole('button',{name:'确认采用此分数',exact:true}).waitFor();
+  assert.equal(db.relationship.warmth_score,82,'score preview must not write');
+  await page.screenshot({path:path.join(output,'timeline-desktop.png'),fullPage:true});
+  await page.getByRole('tab',{name:'关怀任务'}).click();
+  await page.getByRole('checkbox',{name:'启用每日首见提示（成功响应后持久记录）',exact:true}).check();
+  const consent=page.getByRole('checkbox',{name:'我已核对接收者、开关、静默时段和消息上限，确认保存。',exact:true});
+  assert(await consent.isDisabled(),'care confirmation is gated by rule preview');
+  await page.getByRole('button',{name:'预览完整规则与模型请求（不启用）',exact:true}).click();
+  await consent.check();
+  await page.getByRole('button',{name:'确认保存关怀设置',exact:true}).click();
+  await page.getByText('已保存',{exact:true}).waitFor();
+  assert.equal(careWrites,1);assert.equal(careConfig.first_seen,true);assert.equal(careConfig.enabled,false);
+  await page.screenshot({path:path.join(output,'care-desktop.png'),fullPage:true});
+
   await page.setViewportSize({width:390,height:844});await page.getByRole('tab',{name:'今日总览'}).click();await page.getByText('平静而充实',{exact:true}).waitFor();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
   await page.screenshot({path:path.join(output,'overview-mobile.png'),fullPage:true});
   // Check row-heavy screens on a narrow viewport too.
-  for(const name of ['日程','便签','重要日期','智能体绑定','AI 设置','关于']){await page.getByRole('tab',{name}).click();await page.waitForTimeout(200);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overflow in '+name);}
+  for(const name of ['日程','便签','重要日期','智能体绑定','AI 设置','那一天','关怀任务','关于']){await page.getByRole('tab',{name}).click();await page.waitForTimeout(200);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overflow in '+name);}
   await page.setViewportSize({width:1280,height:1000});await page.goto(url+'?dark');await page.getByText('平静而充实',{exact:true}).waitFor();await page.screenshot({path:path.join(output,'overview-dark.png'),fullPage:true});
   const beforeSetup=JSON.stringify([db.state,db.schedule,db.notes,db.relationship,db.dates,db.dreams]);
   db.setup={completed:false,profile:{user_name:'',companion_name:''},has_existing_data:true};
@@ -168,6 +222,6 @@ const server=http.createServer(async(req,res)=>{
   db.agents={supported:false,reason:'宿主未注册 AI 工具',agents:[]};
   await page.getByRole('button',{name:'Refresh status'}).click();
   await page.getByText('宿主未注册 AI 工具',{exact:true}).waitFor();
-  assert.deepEqual(errors,[]);console.log('Browser passed: local name inference, review/consent/apply without model calls, GitHub and About links, credits, localized About page, overview, schedule edit, note edit/search, 390px layouts, dark theme, English, AI settings save/preview/apply, onboarding and preservation, agent bind/unbind/status and unsupported host; no page errors');
+  assert.deepEqual(errors,[]);console.log('Browser passed: timeline/diary/on-this-day safe text, follow-up queue, score preview, model discovery, care review gates, local name inference, review/consent/apply without model calls, GitHub and About links, credits, localized About page, overview, schedule edit, note edit/search, 390px layouts, dark theme, English, AI settings save/preview/apply, onboarding and preservation, agent bind/unbind/status and unsupported host; no page errors');
  }catch(error){console.error('Browser page errors:',errors);await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});throw error;}finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

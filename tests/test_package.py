@@ -14,7 +14,7 @@ def test_package_metadata_and_license(tmp_path):
     with zipfile.ZipFile(tmp_path / f"companion-core-{manifest['version']}.zip") as archive:
         assert archive.testzip() is None
         assert all(name.startswith('companion-core/') for name in archive.namelist())
-        for name in ['plugin.json', 'README.md', 'RELEASE.md', 'ROADMAP.md', 'file_backfill.py', 'CHANGELOG.md', 'LICENSE'] + list(manifest['entry'].values()):
+        for name in ['plugin.json', 'README.md', 'RELEASE.md', 'ROADMAP.md', 'FEATURES.md', 'HOST_VALIDATION.md', '待办清单.md', 'care.py', 'companion_features.py', 'file_backfill.py', 'CHANGELOG.md', 'LICENSE'] + list(manifest['entry'].values()):
             assert archive.read('companion-core/' + name)
         assert b'MIT License' in archive.read('companion-core/LICENSE')
         assert json.loads(archive.read('companion-core/plugin.json'))['license'] == 'MIT'

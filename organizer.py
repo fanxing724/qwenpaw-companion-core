@@ -282,9 +282,14 @@ class ChatOrganizer:
                     c['_validate_date'](item['date'])
                     if not item['date']:
                         raise ValueError('里程碑缺少日期')
-                    if item not in milestones:
+                    item={**item,'event':' '.join(item['event'].split())}
+                    if not item['event']:raise ValueError('里程碑事件不能为空')
+                    identity=(item['date'],item['event'].casefold())
+                    if not any((x.get('date'),' '.join(str(x.get('event','')).split()).casefold())==identity for x in milestones):
                         milestones.append(item)
                 changes = {**changes, 'milestones':milestones}
+            if key in {'state','schedule'} and 'date' not in changes:
+                changes = {**changes,'date':c['_today_str']()}
             return model.model_validate({**before, **changes}).model_dump()
         models = {'notes':c['NoteModel'], 'dreams':c['DreamModel'], 'dates':c['ImportantDateModel']}
         if not isinstance(changes, list) or len(changes) > 50:
@@ -296,6 +301,7 @@ class ChatOrganizer:
             if not isinstance(item, dict) or set(item) - set(model.model_fields):
                 raise ValueError('未知字段或格式错误')
             item = dict(item)
+            if key=='dates' and isinstance(item.get('name'),str):item['name']=item['name'].strip()
             if key == 'notes' and not item.get('id'):
                 if any(note['content'] == item.get('content') for note in records):
                     continue
@@ -475,6 +481,7 @@ class ChatOrganizer:
             priority = 110
             async def run(self, ctx):
                 try:
+                    if getattr(ctx,'extras',{}).get('companion_care_tick'):return HookResult()
                     config = owner.settings()
                     if getattr(ctx, 'extras', {}).get('qwenpaw.session_save_succeeded') is False:
                         return HookResult()

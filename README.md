@@ -35,7 +35,8 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
-- v2.8.0：新增本地称呼推断、手动文件回填基础与按难度推进的功能路线图。
+- v2.8.1：新增每日历史归档、日记时间线、持久化首见、可解释计分、宿主模型发现与可选关怀任务；版本锁定 2.8.x，真机验收完成后再升 2.9.0。
+- v2.8.0：新增本地称呼推断与手动文件回填基础。
 - v2.7.0：新增首次使用引导，将模型配置入口改名为“AI 设置”，新用户以空白记录开始。
 - v2.6.0：新增独立模型聊天整理，每模块 API/模型/提示词配置、手动预览写入及可选自动整理。
 - v2.5.0：新增智能体绑定、工具开关及实际调用记录。
@@ -48,10 +49,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.8.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.8.1.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.8.0.zip
+qwenpaw plugin install /path/to/companion-core-2.8.1.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -181,7 +182,7 @@ API 前缀同现有宿主模式：
 | `/organizer/backfill/preview` | POST | `{review_id, confirmed:true}`，发送已审阅请求或生成本地称呼预览；不写数据 |
 | `/organizer/backfill/apply` | POST | `{preview_id}`，检查冲突、备份后写入 |
 
-后续按难度推进的功能设计见 [ROADMAP.md](ROADMAP.md)。日记、首见提示、定时关怀及持续同步尚未实现。
+按难度推进的设计与当前状态见 [ROADMAP.md](ROADMAP.md)。2.8.1 已实现历史归档、日记/那年今日/大事记、模型发现、计分、首见与可选关怀任务；完整规则与限制见 [FEATURES.md](FEATURES.md)，真实宿主验收见 [HOST_VALIDATION.md](HOST_VALIDATION.md)。所有自动功能需要显式开启；未完成真机验证前保持 2.8.x。
 
 ## 🗂 数据存储
 
@@ -200,7 +201,7 @@ companion-core/
 └── important_dates.yaml # 重要日期
 ```
 
-首次加载会自动补全缺失的种子文件，不覆盖已有文件。可通过 `/api/companion-core/export` 导出备份，`/api/companion-core/import` 恢复。
+首次加载会自动补全缺失的种子文件，不覆盖已有文件；有效日期的状态和日程同时保存在 history/ 中。可通过 `/api/companion-core/export` 导出备份，`/api/companion-core/import` 恢复。
 
 ### 业务时区与数据权限
 
@@ -314,3 +315,5 @@ python3 scripts/package.py
 - 推送 `v<版本号>` 标签：核对标签与 `plugin.json` 版本，验证并打包，自动发布 GitHub Release。
 - Release 页面展示 `RELEASE.md`，附件仅提供插件 ZIP；README 和 LICENSE 保留在仓库及 ZIP 内。
 - 安装 ZIP 顶层为 `companion-core/`，其中包含描述清单、README、发布说明、更新日志和 MIT 协议；缺少必要文件会直接阻止打包。
+
+后续接续与真机验收：[待办清单](待办清单.md)。

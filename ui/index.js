@@ -46,7 +46,10 @@
 
   var MESSAGES = {
     zh: {
-      bfTitle:"从工作区文件回填", bfInferNames:"推断称呼（仅本地）", bfIntro:"手动读取 → 编辑脱敏来源 → 审阅发送全文 → 确认发送 → 预览并确认写入。不会加入自动聊天整理。",
+      discoverHost:"发现宿主模型（不复制密钥）",tabTimeline:"那一天",tabCare:"关怀任务",bfOnThisDay:"那年今日",bfDiary:"日记",bfHistoryEmpty:"该日期暂无状态或日程历史；不会用今天的数据补填。",bfHistoryDates:"可查看的日期",milestoneHint:"这里只展示已确认的关系里程碑。不会从文件修改时间推断事件，也不会虚构“第一次”。关系记录仍由插件共享。",milestoneExtract:"从记忆提取候选（先预览）",bfMilestones:"我们的大事记",bfDraft:"生成本地跟进草稿",bfWhen:"预约时间（留空则按队列规则）",bfFollowup:"问问现在怎么样",bfFollowupHint:"根据选中的日记写一条跟进草稿，确认后加入关怀队列；不会立即发送。",bfQueueFollowup:"确认加入跟进队列",bfScore:"预览可解释亲密度",bfScoreTotal:"建议分数",bfScoreApply:"确认采用此分数",
+      careIntro:"定时、首见、增量、模型问候和梦境默认关闭。选择真实接收目标并确认后启用，定时检查复用宿主调度器，每五分钟合并处理；静默时段保留待办，结束后补发。",careModel:"自动生成一句人设问候（每批最多一次模型调用）",careEnabled:"启用定时关怀",careFirst:"启用每日首见提示（成功响应后持久记录）",careSync:"启用本地记忆变化提示（不自动调用模型或写入事实）",careMorning:"根据当天日程发送问候",careDateSuggestion:"建议提前提醒",careDateScope:"纪念日范围（不选则全部）",careDateSuggestionHint:"提醒建议：提前 3 天；请选择智能体和目标，再预览并确认启用。",careDates:"临近纪念日提醒",careInactive:"久未互动跟进",careDream:"启用一次晚间创作梦境（明确标为创作）",careNoScheduler:"宿主暂不支持兼容调度；可用时启用首见提示。",careTarget:"投递目标",careSelectTarget:"请选择会话目标",careTime:"每日问候最早时间",careQuietStart:"静默开始",careQuietEnd:"静默结束",careMax:"每日合并消息上限",careInactiveDays:"未互动天数",careLead:"纪念日提前天数",careStyleHint:"风格供首见 Agent 与可选模型问候使用；原始提醒事实始终附在问候后。开启模型问候会发送脱敏事项和这段风格，请先审阅请求；不改写 SOUL 或技能文件。",careReadStyle:"读取 SOUL 风格（本地预览）",carePreview:"保存前核对规则与接收者",careConsent:"我已核对接收者、开关、静默时段和消息上限，确认保存。",careReview:"预览完整规则与模型请求（不启用）",careSave:"确认保存关怀设置",careStop:"停止定时关怀",careAttempt:"按保存规则尝试一次",careAttemptConfirm:"将向已保存目标尝试投递，仍遵守静默、去重与频率限制。确定继续？",careIgnoreSync:"忽略本批变更提示（不写事实）",careIgnoreConfirm:"仅清空本批记忆变更提示，不修改原文件或陪伴记录，确定？",careQueue:"延迟与首见队列",careRetry:"核实未收到，重新排队",careRetryConfirm:"请先核实未收到；重新排队可能导致重复投递。确认继续？",careAck:"确认已处理",careAckConfirm:"确认该事项已处理？对应便签将标记为已提醒。",
+
+      bfTitle:"从工作区文件回填", bfInferNames:"推断称呼（仅本地）",bfReadDelta:"读取记忆新增行（不调用模型）",bfAcceptNoChanges:"确认本批无需修改并标记已审阅", bfIntro:"手动读取 → 编辑脱敏来源 → 审阅发送全文 → 确认发送 → 预览并确认写入。不会加入自动聊天整理。",
       bfPrivacy:"正则脱敏不能识别所有秘密，请逐字检查并删除敏感内容；建议使用本地免密模型。AGENTS.md 不读取，agent.json 只在本地取 name，不发送配置或密钥。PROFILE 上限 4000 字符，MEMORY 3000，近期最多 3 篇共 2000，SOUL 风格 1500。",
       bfModules:"将使用已启用的回填模块", bfNamesOnly:"仅本地称呼预览，不调用模型", bfStyle:"仅风格", bfRead:"读取来源（不调用模型）", bfReview:"生成发送全文（不调用模型）", bfCandidateHint:"候选称呼标明来源。现有称呼优先保留；如需替换请手动修改输入框。PROFILE 显式资料优先，无法确定的称呼不推断。", bfTruncated:"已截断", bfOutbound:"将要发送的完整请求", bfFrozen:"下面显示每个模块的接收地址、模型与完整消息。确认后只发送这份快照；模型配置或当前数据变化会要求重新审阅。确认发送会消耗模型额度。", bfProfileLocal:"称呼变更仅在本地处理，确认写入前不保存：", bfConsent:"我已检查全文与接收地址，确认继续；模型请求完成后仍需另行确认写入。", bfSend:"确认发送并生成结果预览", bfLocalPreview:"生成本地称呼结果预览",
 
@@ -115,7 +118,10 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
-      bfTitle:"Backfill from workspace files", bfInferNames:"Infer names (local only)", bfIntro:"Read → edit redacted sources → inspect full requests → confirm sending → preview and confirm saving. Never runs automatically with chats.",
+      discoverHost:"Discover host model (no key copied)",tabTimeline:"That day",tabCare:"Care tasks",bfOnThisDay:"On this day",bfDiary:"Diary",bfHistoryEmpty:"No state or schedule history for this date. Current data is never substituted.",bfHistoryDates:"Available dates",milestoneHint:"Only confirmed milestones are shown. File modification times never become event dates; first events are not invented. Relationship data remains shared.",milestoneExtract:"Extract memory candidates (preview first)",bfMilestones:"Our milestones",bfDraft:"Draft a local follow-up",bfWhen:"Schedule time (blank uses queue rules)",bfFollowup:"Follow up",bfFollowupHint:"Write a follow-up draft based on this diary. Confirmation queues it without sending immediately.",bfQueueFollowup:"Confirm and queue follow-up",bfScore:"Preview explainable warmth score",bfScoreTotal:"Proposed score",bfScoreApply:"Confirm this score",
+      careIntro:"Scheduling, first-conversation hints, sync, model greetings and dreams are off by default. Confirm a real recipient before enabling. Uses the host scheduler every five minutes; quiet hours defer messages until the window ends.",careModel:"Generate a styled greeting (at most one model call per batch)",careEnabled:"Enable scheduled care",careFirst:"Enable daily first-conversation hints (persist after successful reply)",careSync:"Notify local memory changes (no automatic model calls or fact writes)",careMorning:"Greeting based on today's schedule",careDateSuggestion:"Suggest a reminder",careDateScope:"Anniversaries (empty means all)",careDateSuggestionHint:"Suggested lead time: 3 days. Choose an agent and recipient, review, then confirm enabling.",careDates:"Upcoming anniversary reminders",careInactive:"Follow up after inactivity",careDream:"Enable one evening fictional dream (labeled as creative)",careNoScheduler:"Compatible scheduling is unavailable; first-conversation hints may still be supported.",careTarget:"Recipient",careSelectTarget:"Choose a conversation target",careTime:"Earliest greeting time",careQuietStart:"Quiet hours start",careQuietEnd:"Quiet hours end",careMax:"Daily merged-message limit",careInactiveDays:"Days without interaction",careLead:"Anniversary lead days",careStyleHint:"Style is for first-conversation phrasing and optional model greetings. Original facts are always appended. Model greetings send redacted items and this style; inspect the request first. SOUL and skill files are preserved.",careReadStyle:"Preview local SOUL style",carePreview:"Review rules and recipient before saving",careConsent:"I checked the recipient, switches, quiet hours and frequency limit and confirm saving.",careReview:"Preview rules and model request (no enabling)",careSave:"Confirm care settings",careStop:"Stop scheduled care",careAttempt:"Try once with saved rules",careAttemptConfirm:"Attempt delivery to the saved recipient, respecting quiet hours, deduplication and frequency limits?",careIgnoreSync:"Dismiss memory-change hints (no fact writes)",careIgnoreConfirm:"Clear these memory-change hints without modifying files or companion records?",careQueue:"Deferred and first-conversation queue",careRetry:"Verified missing: requeue",careRetryConfirm:"Verify it was not received. Requeueing could duplicate delivery. Continue?",careAck:"Confirm handled",careAckConfirm:"Confirm this item was handled? Its note will be marked reminded.",
+
+      bfTitle:"Backfill from workspace files", bfInferNames:"Infer names (local only)",bfReadDelta:"Read added memory lines (no model call)",bfAcceptNoChanges:"Confirm no changes and mark reviewed", bfIntro:"Read → edit redacted sources → inspect full requests → confirm sending → preview and confirm saving. Never runs automatically with chats.",
       bfPrivacy:"Redaction cannot detect every secret. Inspect the full text and remove sensitive content; prefer a local keyless model. AGENTS.md is excluded. Only agent.json name is read locally; configuration and keys are never sent. Limits: PROFILE 4000 chars, MEMORY 3000, up to 3 recent files totaling 2000, SOUL style 1500.",
       bfModules:"Enabled backfill modules", bfNamesOnly:"Local name preview only; no model calls", bfStyle:"style only", bfRead:"Read sources (no model call)", bfReview:"Build full request preview (no model call)", bfCandidateHint:"Name candidates include provenance. Existing names are preserved unless you edit them. Explicit PROFILE fields take priority; uncertain names are not inferred.", bfTruncated:"truncated", bfOutbound:"Complete outgoing requests", bfFrozen:"Inspect each recipient, model and complete message. Only this frozen snapshot is sent. Changed settings or data require a new review. Sending uses model credits.", bfProfileLocal:"Name changes are local and saved only after confirmation:", bfConsent:"I inspected the complete text and recipients and confirm continuing. Saving still requires a separate confirmation.", bfSend:"Confirm sending and preview results", bfLocalPreview:"Preview local name changes",
 
@@ -208,7 +214,15 @@
 
   // 后端按本地日期存 key，前端也必须用本地日期：toISOString 是 UTC，
   // 东八区每天 0-8 点会少算一天。
+  var BUSINESS_TIMEZONE = "", BUSINESS_DAY = "";
   function localToday() {
+    if (BUSINESS_TIMEZONE) {
+      try {
+        var parts = new Intl.DateTimeFormat('en-CA',{timeZone:BUSINESS_TIMEZONE,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+        var values={};parts.forEach(function(p){values[p.type]=p.value;});
+        return values.year+'-'+values.month+'-'+values.day;
+      } catch (e) { if(BUSINESS_DAY)return BUSINESS_DAY; }
+    }
     var d = new Date();
     var m = d.getMonth() + 1, day = d.getDate();
     return d.getFullYear() + "-" + (m < 10 ? "0" + m : m) + "-" + (day < 10 ? "0" + day : day);
@@ -347,13 +361,28 @@
     getDates: function () { return apiFetch("/companion-core/dates"); },
     addDate: function (d) { return apiFetch("/companion-core/dates", { method: "POST", body: d }); },
     deleteDate: function (n) { return apiFetch("/companion-core/dates/" + encodeURIComponent(n), { method: "DELETE" }); },
-    exportAll: function () { return apiFetch("/companion-core/export"); },
+    exportAll: function () { return apiFetch("/companion-core/export?include_history=true"); },
     importAll: function (d) { return apiFetch("/companion-core/import", { method: "POST", body: d }); },
     setup: function () { return apiFetch("/companion-core/setup"); },
     completeSetup: function (data) { return apiFetch("/companion-core/setup",{method:"POST",body:data}); },
     organizerConfig: function () { return apiFetch("/companion-core/organizer/config"); },
     saveOrganizer: function (data) { return apiFetch("/companion-core/organizer/config", {method:"PUT",body:data}); },
     organizerChats: function (id) { return apiFetch("/companion-core/organizer/chats?agent_id=" + encodeURIComponent(id)); },
+    timeline:function(agent,day){return apiFetch('/companion-core/timeline?agent_id='+encodeURIComponent(agent)+'&day='+encodeURIComponent(day));},
+    discoverModel:function(agent){return apiFetch('/companion-core/organizer/discover-model?agent_id='+encodeURIComponent(agent));},
+    scorePlan:function(){return apiFetch('/companion-core/relationship/score-preview');},
+    scoreApply:function(id){return apiFetch('/companion-core/relationship/score-apply',{method:'POST',body:{preview_id:id,confirmed:true}});},
+    care:function(agent){return apiFetch('/companion-core/care?agent_id='+encodeURIComponent(agent));},
+    reviewCare:function(body){return apiFetch('/companion-core/care/preview',{method:'POST',body:body});},
+    saveCare:function(body){return apiFetch('/companion-core/care',{method:'PUT',body:body});},
+    stylePreview:function(agent){return apiFetch('/companion-core/style-preview?agent_id='+encodeURIComponent(agent));},
+    followupPreview:function(agent,day){return apiFetch('/companion-core/care/followup-preview?agent_id='+encodeURIComponent(agent)+'&day='+encodeURIComponent(day));},
+    followup:function(body){return apiFetch('/companion-core/care/followup',{method:'POST',body:body});},
+    retryCare:function(agent,id){return apiFetch('/companion-core/care/retry',{method:'POST',body:{agent_id:agent,event_id:id,confirmed:true}});},
+    ackCare:function(agent,id){return apiFetch('/companion-core/care/ack',{method:'POST',body:{agent_id:agent,event_id:id,confirmed:true}});},
+    dismissSync:function(agent){return apiFetch('/companion-core/memory-sync/ack',{method:'POST',body:{agent_id:agent,confirmed:true}});},
+    stopCare:function(agent){return apiFetch('/companion-core/care/stop',{method:'POST',body:{agent_id:agent,confirmed:true}});},
+    attemptCare:function(agent){return apiFetch('/companion-core/care/attempt',{method:'POST',body:{agent_id:agent,confirmed:true}});},
     backfillSources: function(body){return apiFetch("/companion-core/organizer/backfill/sources",{method:"POST",body:body});},
     backfillReview: function(body){return apiFetch("/companion-core/organizer/backfill/review",{method:"POST",body:body});},
     backfillPreview: function(body){return apiFetch("/companion-core/organizer/backfill/preview",{method:"POST",body:body});},
@@ -362,7 +391,7 @@
     organizerApply: function (id) { return apiFetch("/companion-core/organizer/apply", {method:"POST",body:{preview_id:id}}); },
     agents: function () { return apiFetch("/companion-core/agents"); },
     bindAgent: function (id, enabled) { return apiFetch("/companion-core/agents/" + encodeURIComponent(id) + "/binding", {method:"PUT", body:{enabled:enabled}}); },
-    health: function () { return apiFetch("/companion-core/health"); },
+    health: function () { return apiFetch("/companion-core/health").then(function(data){BUSINESS_TIMEZONE=data.timezone||BUSINESS_TIMEZONE;BUSINESS_DAY=data.today||BUSINESS_DAY;return data;}); },
   };
 
   // ── Shared UI pieces ─────────────────────────────────────────────────
@@ -827,8 +856,8 @@
     if (!isValidDate(dateStr)) return null;
     var m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
     if (!m || !d) return null;
-    var now = new Date();
-    var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var calendar=localToday().split("-");
+    var today0 = new Date(+calendar[0],+calendar[1]-1,+calendar[2]);
     for (var year = today0.getFullYear(); year <= today0.getFullYear() + 8; year++) {
       var next = new Date(year, m - 1, d);
       if (next.getMonth() !== m - 1 || next.getDate() !== d || next < today0) continue;
@@ -892,6 +921,7 @@
                 h("span", { style: { color: C.text, fontSize: 13, fontWeight: 500 } }, item.name || ""),
                 h("span", { style: { flex: 1, color: C.muted, fontSize: 12 } }, item.note || ""),
                 label ? h(Tag, { color: left === 0 ? "red" : "gold" }, label) : null,
+                h(Button,{size:"small",onClick:function(){if(props.onCare)props.onCare(item);}},t("careDateSuggestion")),
                 h(Popconfirm, { title: t("confirmDeleteDate", { name: item.name }), onConfirm: function () { removeDate(item.name); } },
                   h(Button, { size: "small", type: "link", danger: true, disabled: saving }, t("delete"))));
             })),
@@ -958,6 +988,98 @@
           h(Button,{type:"primary",loading:busy,disabled:busy||!config,onClick:function(){complete(false);}},t("setupFinish"))));
   }
 
+  function FeatureAgent(props) {
+    var s=useAsync(api.agents,[]);
+    useEffect(function(){if(s.data&&!props.value){var first=(s.data.agents||[]).find(function(a){return a.enabled_tools&&a.enabled_tools.length&&a.agent_enabled!==false;});if(first)props.onChange(first.id);}},[s.data]);
+    return h('label',{style:{display:'block',marginBottom:16}},props.t('orgAgent'),h('select',{'aria-label':props.label||props.t('orgAgent'),value:props.value,onChange:function(e){props.onChange(e.target.value);},style:{display:'block',width:'100%',padding:10,background:props.C.cardBg,color:props.C.text,borderRadius:8}},h('option',{value:''},props.t('orgChooseAgent')),(s.data&&s.data.agents||[]).filter(function(a){return a.enabled_tools&&a.enabled_tools.length&&a.agent_enabled!==false;}).map(function(a){return h('option',{key:a.id,value:a.id},a.name+' ('+a.id+')');})),s.error?h('span',null,s.error.message):s.data&&!s.data.supported?h('p',{role:'status'},s.data.reason||props.t('agentNoSdk')):null);
+  }
+
+  function TimelineTab(props) {
+    var t=props.t,C=props.C;
+    var as=useState(''),agent=as[0],setAgent=as[1];
+    var ds=useState(localToday()),day=ds[0],setDay=ds[1];
+    var dataState=useState(null),data=dataState[0],setData=dataState[1];
+    var es=useState(''),notice=es[0],setNotice=es[1];
+    var bs=useState(false),busy=bs[0],setBusy=bs[1];
+    var fs=useState(''),followup=fs[0],setFollowup=fs[1];
+    var whenState=useState(''),when=whenState[0],setWhen=whenState[1];
+    var ss=useState(null),score=ss[0],setScore=ss[1];
+    useEffect(function(){var active=true;setData(null);setNotice('');if(agent)api.timeline(agent,day).then(function(value){if(active)setData(value);}).catch(function(e){if(active)setNotice(e.message);});return function(){active=false;};},[agent,day,props.revision]);
+    function action(fn){setBusy(true);setNotice('');Promise.resolve().then(fn).catch(function(e){setNotice(e.message);}).then(function(){setBusy(false);});}
+    function text(value){return h('pre',{style:{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:500,overflow:'auto',fontFamily:'inherit'}},value||t('noScore'));}
+    return h('section',{style:panelStyle(C)},h('h2',null,t('tabTimeline')),
+      h(FeatureAgent,{t:t,C:C,value:agent,onChange:setAgent,label:'timeline agent'}),
+      h('label',null,t('fDate'),' ',h('input',{type:'date',value:day,'aria-label':'timeline date',onChange:function(e){if(isValidDate(e.target.value))setDay(e.target.value);}})),
+      notice?h('p',{role:'status'},notice):null,
+      data?h('div',null,h('p',{style:{color:C.sub}},data.shared_data_notice),
+        h('h3',null,t('bfOnThisDay')),data.on_this_day.length?data.on_this_day.map(function(value){return h(Button,{key:value,onClick:function(){setDay(value);},style:{marginRight:8}},value);}):h('p',null,t('noScore')),
+        h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,300px),1fr))',gap:20}},
+          h('article',null,h('h3',null,t('bfDiary')),text(data.diary),data.diary_notice?h('p',null,data.diary_notice):null),
+          h('article',null,h('h3',null,t('tabDreams')),text(data.dream))),
+        h('h3',null,t('tabState')),data.state?h('p',null,[data.state.mood,data.state.energy===null?'':data.state.energy+'/100',data.state.sleep,data.state.health,data.state.note].filter(Boolean).join(' · ')):h('p',null,t('bfHistoryEmpty')),
+        h('h3',null,t('tabSchedule')),data.schedule&&data.schedule.plan.length?data.schedule.plan.map(function(x,i){return h('p',{key:i},x.time+' '+x.activity);}):h('p',null,t('bfHistoryEmpty')),
+        h('h3',null,t('upcoming')),data.countdown.map(function(x){return h('p',{key:x.name},x.name+' · '+t('inDays',{count:x.days_until}));}),
+        h('details',null,h('summary',null,t('bfHistoryDates')),data.dates.map(function(x){return h(Button,{key:x,size:'small',style:{margin:4},onClick:function(){setDay(x);}},x);})),
+        h('h3',null,t('bfMilestones')),data.milestones.slice().sort(function(a,b){return a.date.localeCompare(b.date);}).map(function(x,i){return h('p',{key:i},x.date+' · '+x.event);}),
+        h('h3',null,t('bfFollowup')),h('p',null,t('bfFollowupHint')),
+        h(Button,{disabled:busy||!data.diary,onClick:function(){action(function(){return api.followupPreview(agent,day).then(function(value){setFollowup(value.draft);});});}},t('bfDraft')),
+        h('label',{style:{display:'block',margin:'12px 0'}},t('bfWhen'),' ',h('input',{type:'datetime-local',value:when,onChange:function(e){setWhen(e.target.value);}})),
+        h(TextArea,{'aria-label':t('bfFollowup'),rows:3,maxLength:1500,value:followup,onChange:function(e){setFollowup(e.target.value);}}),
+        h(Button,{disabled:busy||!followup.trim()||!data.diary,onClick:function(){action(function(){return api.followup({agent_id:agent,date:day,text:followup,confirmed:true,send_after:when?new Date(when).toISOString():null}).then(function(result){setNotice(result.notice);setFollowup('');});});}},t('bfQueueFollowup'))):null,
+      h('hr'),h(Button,{disabled:busy,onClick:function(){action(function(){return api.scorePlan().then(setScore);});}},t('bfScore')),
+      score?h('div',null,h('p',null,score.notice),h('p',null,t('bfScoreTotal')+': '+score.proposed+' / 100'),score.parts.map(function(part,i){return h('details',{key:i,open:true},h('summary',null,part.rule+' → +'+part.points),part.evidence.map(function(e,j){return h('p',{key:j},e.date+' '+(e.event||e.name));}));}),
+        h(Button,{type:'primary',disabled:busy,onClick:function(){action(function(){return api.scoreApply(score.preview_id).then(function(){setScore(null);setNotice(t('saved'));props.onApplied();});});}},t('bfScoreApply'))):null);
+  }
+
+  function MilestonesTab(props) {
+    var t=props.t,C=props.C,s=useAsync(api.getRelationship,[]);
+    if(s.loading)return h(LoadingBlock,{t:t,C:C});
+    if(s.error)return h(ErrorBlock,{t:t,C:C,error:s.error,onRetry:s.retry});
+    var records=(s.data.milestones||[]).filter(function(x){return isValidDate(x.date)&&typeof x.event==='string';}).slice().sort(function(a,b){return a.date.localeCompare(b.date);});
+    return h('section',{style:panelStyle(C)},h('h2',null,t('bfMilestones')),h('p',null,t('milestoneHint')),
+      h(Button,{onClick:function(){props.navigate('organizer');}},t('milestoneExtract')),
+      records.length?records.map(function(item,i){return h('article',{key:i,style:{borderLeft:'3px solid '+C.accent,padding:'6px 16px',margin:'20px 0'}},h('strong',null,item.date),h('p',null,item.event));}):h(Empty,{description:t('noMilestones')}));
+  }
+
+  function CareTab(props) {
+    var t=props.t,C=props.C;
+    var as=useState(''),agent=as[0],setAgent=as[1];
+    var ds=useState(null),data=ds[0],setData=ds[1];
+    var cs=useState(null),cfg=cs[0],setCfg=cs[1];
+    var es=useState(''),notice=es[0],setNotice=es[1];
+    var bs=useState(false),busy=bs[0],setBusy=bs[1];
+    var dirtyState=useState(false),dirty=dirtyState[0],setDirty=dirtyState[1];
+    var reviewState=useState(null),review=reviewState[0],setReview=reviewState[1];
+    var confirmState=useState(false),confirmed=confirmState[0],setConfirmed=confirmState[1];
+    function load(){return api.care(agent).then(function(value){setData(value);setCfg(value.settings);setDirty(false);setConfirmed(false);setReview(null);});}
+    useEffect(function(){var alive=true;setCfg(null);setData(null);setNotice('');if(agent)api.care(agent).then(function(value){if(alive){setData(value);setCfg(value.settings);setDirty(false);setConfirmed(false);setReview(null);}}).catch(function(e){if(alive)setNotice(e.message);});return function(){alive=false;};},[agent]);
+    useEffect(function(){if(props.suggestion&&cfg){update('anniversary_names',[props.suggestion.name]);update('anniversaries',true);update('anniversary_lead',3);}},[props.suggestion,data&&data.settings.agent_id]);
+    function update(key,value){setCfg(function(old){var next=Object.assign({},old);next[key]=value;return next;});setDirty(true);setConfirmed(false);setReview(null);}
+    function action(fn){if(busy)return;setBusy(true);setNotice('');Promise.resolve().then(fn).catch(function(e){setNotice(e.message);}).then(function(){setBusy(false);});}
+    var switches={model_greeting:'careModel',enabled:'careEnabled',first_seen:'careFirst',sync_enabled:'careSync',morning:'careMorning',notes:'tabNotes',anniversaries:'careDates',inactivity:'careInactive',dream_enabled:'careDream'};
+    return h('section',{style:panelStyle(C)},h('h2',null,t('tabCare')),h('p',null,t('careIntro')),
+      h(FeatureAgent,{t:t,C:C,value:agent,onChange:setAgent,label:'care agent'}),notice?h('p',{role:'status'},notice):null,
+      data&&cfg?h('div',null,h('p',null,data.notice),props.suggestion?h('p',null,props.suggestion.name+' · '+props.suggestion.date+' · '+t('careDateSuggestionHint')):null,!data.scheduler_supported?h('p',null,t('careNoScheduler')):null,
+        Object.keys(switches).map(function(key){return h('label',{key:key,style:{display:'block',margin:'12px 0'}},h('input',{type:'checkbox',checked:cfg[key],disabled:busy||(key==='enabled'&&!data.scheduler_supported)||(['first_seen','sync_enabled'].includes(key)&&!data.hooks_supported),onChange:function(e){update(key,e.target.checked);}}),' '+t(switches[key]));}),
+        h('label',null,t('careTarget'),h('select',{'aria-label':t('careTarget'),value:JSON.stringify([cfg.channel,cfg.user_id,cfg.session_id]),disabled:busy,style:{display:'block',width:'100%',padding:10},onChange:function(e){var value=JSON.parse(e.target.value);update('channel',value[0]);update('user_id',value[1]);update('session_id',value[2]);}},h('option',{value:JSON.stringify(['console','',''])},t('careSelectTarget')),data.targets.map(function(x,i){return h('option',{key:i,value:JSON.stringify([x.channel,x.user_id,x.session_id])},x.channel+' · '+x.user_id+' · '+x.session_id);}))),
+        h('label',{style:{display:'block',margin:'12px 0'}},t('careDateScope'),h('select',{multiple:true,value:cfg.anniversary_names||[],disabled:busy,style:{display:'block',width:'100%',minHeight:80},'aria-label':t('careDateScope'),onChange:function(e){update('anniversary_names',Array.from(e.target.selectedOptions).map(function(o){return o.value;}));}},(data.important_dates||[]).map(function(x){return h('option',{key:x.name,value:x.name},x.name+' · '+x.date);}))),
+        ['time','quiet_start','quiet_end'].map(function(key){return h('label',{key:key,style:{display:'block',margin:'12px 0'}},t({time:'careTime',quiet_start:'careQuietStart',quiet_end:'careQuietEnd'}[key])+' ',h('input',{type:'time',value:cfg[key],disabled:busy,'aria-label':key,onChange:function(e){update(key,e.target.value);}}));}),
+        ['max_daily','inactivity_days','anniversary_lead'].map(function(key){return h(EditorRow,{key:key,C:C,label:t({max_daily:'careMax',inactivity_days:'careInactiveDays',anniversary_lead:'careLead'}[key])},h(InputNumber,{min:key==='anniversary_lead'?0:key==='inactivity_days'?2:1,max:key==='max_daily'?5:key==='inactivity_days'?90:30,value:cfg[key],onChange:function(v){if(v!==null)update(key,v);},disabled:busy}));}),
+        h('p',null,t('careStyleHint')),h(Button,{disabled:busy,onClick:function(){action(function(){return api.stylePreview(agent).then(function(result){update('style',result.style);setNotice(result.notice);});});}},t('careReadStyle')),
+        h(TextArea,{'aria-label':t('bfStyle'),rows:4,maxLength:1500,value:cfg.style,disabled:busy,onChange:function(e){update('style',e.target.value);}}),
+        cfg.model_greeting?h('details',{open:true},h('summary',null,t('bfOutbound')),h('pre',{style:{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:350,overflow:'auto'}},JSON.stringify(review?review.model_plan:data.model_plan,null,2))):null,
+        h('p',null,t('carePreview')+': '+cfg.channel+' → '+cfg.user_id+' / '+cfg.session_id+' · '+cfg.time+' · '+t('careQuietStart')+' '+cfg.quiet_start+'–'+cfg.quiet_end),
+        h('label',null,h('input',{type:'checkbox',checked:confirmed,disabled:busy||!review,onChange:function(e){setConfirmed(e.target.checked);}}),' '+t('careConsent')),
+        h('div',{style:{display:'flex',gap:12,flexWrap:'wrap',margin:'16px 0'}},
+          h(Button,{disabled:busy,onClick:function(){action(function(){return api.reviewCare(cfg).then(function(value){setReview(value);setConfirmed(false);});});}},t('careReview')),
+          h(Button,{type:'primary',disabled:busy||!confirmed||!review,onClick:function(){action(function(){return api.saveCare(Object.assign({},cfg,{confirmed:true,review_id:review.review_id})).then(function(value){setData(value);setCfg(value.settings);setDirty(false);setConfirmed(false);setReview(null);setNotice(t('saved'));});});}},t('careSave')),
+          h(Button,{disabled:busy,onClick:function(){action(load);}},t('refresh')),
+          h(Button,{danger:true,disabled:busy,onClick:function(){action(function(){return api.stopCare(agent).then(load);});}},t('careStop')),
+          h(Popconfirm,{title:t('careAttemptConfirm'),onConfirm:function(){action(function(){return api.attemptCare(agent).then(function(result){setNotice(result.state);return load();});});}},h(Button,{disabled:busy||dirty||!cfg.enabled},t('careAttempt')))),
+        h('h3',null,t('careQueue')),data.memory_changes&&data.memory_changes.length?h('div',null,h('p',null,'Memory: '+data.memory_changes.join(', ')),h(Popconfirm,{title:t('careIgnoreConfirm'),onConfirm:function(){action(function(){return api.dismissSync(agent).then(load);});}},h(Button,{disabled:busy},t('careIgnoreSync')))):null,h('p',null,data.status+' · '+(data.last_prompted_date||'—')+' · '+t('orgRequests')+': '+(data.model_attempts_today||0)),
+        data.queue.map(function(item){return h('article',{key:item.id,style:{padding:12,border:C.border,marginBottom:8,borderRadius:8}},h('p',{style:{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}},item.text),h('p',null,item.state),h(Popconfirm,{title:t('careRetryConfirm'),onConfirm:function(){action(function(){return api.retryCare(agent,item.id).then(load);});}},h(Button,{disabled:busy||item.state==='sending',style:{marginRight:8}},t('careRetry'))),h(Popconfirm,{title:t('careAckConfirm'),onConfirm:function(){action(function(){return api.ackCare(agent,item.id).then(load);});}},h(Button,{disabled:busy},t('careAck'))));})):null);
+  }
+
   function FileBackfillPanel(props) {
     var t=props.t,C=props.C;
     var a=useState({profile:true,memory:true,recent:true,style:false}),flags=a[0],setFlags=a[1];
@@ -973,7 +1095,7 @@
     useEffect(function(){setDraft(null);setReview(null);setPreview(null);setConfirmed(false);},[props.agentId,props.dirty]);
     function run(fn){if(busy)return;setBusy(true);setError('');Promise.resolve().then(fn).catch(function(e){setError(e.message);}).then(function(){setBusy(false);});}
     function clear(){setDraft(null);setReview(null);setPreview(null);setConfirmed(false);}
-    function read(onlyNames){setLocalOnly(onlyNames);run(function(){return api.backfillSources(Object.assign({agent_id:props.agentId},onlyNames?{profile:true,memory:false,recent:false,style:false}:flags)).then(function(data){
+    function read(onlyNames,incremental){setLocalOnly(onlyNames);run(function(){return api.backfillSources(Object.assign({agent_id:props.agentId},onlyNames?{profile:true,memory:false,recent:false,style:false}:flags,{incremental:!!incremental})).then(function(data){
       setDraft(data);setReview(null);setPreview(null);setConfirmed(false);
       var values={},names=Object.assign({},data.current_profile);
       data.documents.forEach(function(doc){values[doc.name]=doc.text;});
@@ -991,6 +1113,7 @@
       h('div',{style:{display:'flex',gap:16,flexWrap:'wrap'}},Object.keys(flags).map(function(key){return h('label',{key:key},h('input',{type:'checkbox',checked:flags[key],disabled:busy,onChange:function(e){var next=Object.assign({},flags);next[key]=e.target.checked;setFlags(next);clear();}}),' '+({profile:'PROFILE.md + agent.json / SOUL name',memory:'MEMORY.md',recent:'memory/*.md',style:'SOUL.md ('+t('bfStyle')+')'})[key]);})),
       h(Button,{style:{margin:'12px 12px 0 0'},disabled:busy||props.dirty||!props.agentId,onClick:function(){read(true);}},t('bfInferNames')),
       h(Button,{style:{marginTop:12},disabled:busy||props.dirty||!props.agentId,onClick:function(){read(false);}},t('bfRead')),
+      h(Button,{style:{margin:'12px 0 0 12px'},disabled:busy||props.dirty||!props.agentId,onClick:function(){read(false,true);}},t('bfReadDelta')),
       error?h('p',{role:'status',style:{whiteSpace:'pre-wrap'}},error):null,
       draft?h('div',null,
         h('p',null,t('bfCandidateHint')),
@@ -1008,7 +1131,7 @@
         h('label',null,h('input',{type:'checkbox',checked:confirmed,disabled:busy,onChange:function(e){setConfirmed(e.target.checked);}}),' '+t('bfConsent')),
         h('div',{style:{marginTop:12}},h(Button,{type:'primary',loading:busy,disabled:busy||!confirmed,onClick:generate},t(review.requests.length?'bfSend':'bfLocalPreview')))):null,
       preview?h('section',null,h('h3',null,t('orgPreviewHint')),json(preview.changes),h('p',null,t('orgUsage')),json(preview.usage),
-        h(Button,{type:'primary',disabled:busy||!Object.keys(preview.changes).length,onClick:apply},t('orgApply'))):null,
+        h(Button,{type:'primary',disabled:busy,onClick:apply},t(Object.keys(preview.changes).length?'orgApply':'bfAcceptNoChanges'))):null,
       draft?h(Button,{disabled:busy,onClick:clear,style:{margin:'12px 0 0 12px'}},t('orgDiscard')):null);
   }
 
@@ -1059,6 +1182,7 @@
       provider(form),
       field(t("orgAgent"),h("select",{value:agentId,disabled:busy,style:selectStyle,"aria-label":t("orgAgent"),onChange:function(e){update("agent_id",e.target.value);}},
         h("option",{value:""},t("orgChooseAgent")),agents.filter(function(a){return a.enabled_tools && a.enabled_tools.length && a.agent_enabled!==false;}).map(function(a){return h("option",{key:a.id,value:a.id},a.name+" ("+a.id+")");}))),
+      h(Button,{disabled:busy||!agentId,onClick:function(){run(function(){return api.discoverModel(agentId).then(function(data){if(!data.available){setNotice(data.reason);return;}update('base_url',data.base_url);update('model',data.model);update('api_key','');update('clear_api_key',true);setNotice(data.hint);});});}},t('discoverHost')),
       field(t("orgChat"),h("select",{value:chat,disabled:busy,style:selectStyle,"aria-label":t("orgChat"),onChange:function(e){setChat(e.target.value);setPreview(null);}},
         h("option",{value:""},t("orgChooseChat")),chats.map(function(item){return h("option",{key:item.id,value:item.id},item.name+" · "+item.updated_at);}))),
       h(FileBackfillPanel,{t:t,C:C,agentId:agentId,dirty:dirty,modules:['relationship','dates'].filter(function(key){return form.modules[key].enabled;}),onApplied:function(){s.retry();if(props.onApplied)props.onApplied();}}),
@@ -1237,7 +1361,7 @@
 .cc-tabs>.ant-tabs-nav{margin-bottom:24px}.cc-tabs .ant-tabs-tab{padding:12px 4px;font-size:14px}.cc-tabs .ant-tabs-ink-bar{background:var(--cc-accent)}.cc-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn{color:var(--cc-accent)}
 .cc-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}.cc-metric{text-align:left;display:flex;flex-direction:column;position:relative;gap:12px;padding:22px 20px;background:var(--cc-card);color:var(--cc-text);border:1px solid rgba(127,127,127,.14);border-radius:18px;cursor:pointer;min-width:0;font:inherit;transition:transform .18s,border-color .18s}.cc-metric:hover{transform:translateY(-3px);border-color:var(--cc-accent)}.cc-metric:focus-visible{outline:2px solid var(--cc-accent);outline-offset:3px}.cc-metric strong{font-size:25px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}.cc-metric-icon{position:absolute;right:18px;top:16px;font-size:22px;color:var(--cc-accent)}.cc-metric .cc-eyebrow{padding-right:22px;letter-spacing:0}.cc-metric-detail{font-size:12px;color:var(--cc-sub);line-height:1.6;overflow-wrap:anywhere}.cc-overview-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px}.cc-timeline-row{display:flex;gap:20px;padding:15px 0;border-bottom:1px solid rgba(127,127,127,.1);overflow-wrap:anywhere}.cc-timeline-row time{font-variant-numeric:tabular-nums;color:var(--cc-accent);font-weight:600;flex-shrink:0}.cc-date-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid rgba(127,127,127,.1)}.cc-date-row small{display:block;color:var(--cc-sub);margin-top:5px}.cc-note-preview{padding:14px 16px;background:rgba(236,72,153,.04);border-left:3px solid var(--cc-accent);border-radius:4px 10px 10px 4px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.cc-search-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.cc-app .ant-btn{border-radius:8px}.cc-app .ant-input,.cc-app .ant-input-affix-wrapper{border-radius:8px}.cc-app section{min-width:0}.cc-app .ant-tabs-content-holder{min-width:0}
 @media(max-width:760px){.cc-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.cc-overview-grid{grid-template-columns:1fr}.cc-hero{padding:24px}.cc-today{display:none}.cc-hero h1{font-size:26px}.cc-app{padding-top:16px}.cc-app .ant-space{flex-wrap:wrap}.cc-app .ant-tabs-tab+.ant-tabs-tab{margin-left:20px}}
-@media(max-width:760px){.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap{overflow:visible}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.ant-tabs-nav .ant-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.ant-tabs-nav .ant-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-operations,.cc-tabs>.ant-tabs-nav .ant-tabs-ink-bar{display:none}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:before,.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:after{display:none}}
+.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap{overflow:visible}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.ant-tabs-nav .ant-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.ant-tabs-nav .ant-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-operations,.cc-tabs>.ant-tabs-nav .ant-tabs-ink-bar{display:none}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:before,.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:after{display:none}
 @media(max-width:420px){.cc-metric{padding:16px 12px}.cc-metric strong{font-size:21px}.cc-metric-icon{right:12px;top:12px}.cc-hero{padding:20px}.cc-hero h1{font-size:24px}}
 @media(prefers-reduced-motion:reduce){.cc-metric{transition:none}}
 .cc-project-links{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.cc-today .cc-project-links{justify-content:flex-end}.cc-project-link{color:var(--cc-accent);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}.cc-project-link:focus-visible{outline:2px solid var(--cc-accent);outline-offset:4px}.cc-about{padding:24px;background:var(--cc-card);border-radius:16px;line-height:1.8;color:var(--cc-text)}.cc-about h2{margin-top:0}.cc-credit{font-weight:600}.cc-about nav{margin:20px 0}
@@ -1265,6 +1389,7 @@
   }
 
   function CompanionApp() {
+    var careSuggestionState=useState(null),careSuggestion=careSuggestionState[0],setCareSuggestion=careSuggestionState[1];
     var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
     var _rev = useState(0), revision = _rev[0], setRevision = _rev[1];
     var setupState=useState(null),setupData=setupState[0],setSetupData=setupState[1];
@@ -1308,10 +1433,13 @@
           { key: "dreams", label: "💭 " + t("tabDreams"), children: h(DreamsTab, { key:revision, t: t, C: C }) },
           { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { key:revision, t: t, C: C }) },
           { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { key:revision, t: t, C: C }) },
-          { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C }) },
+          { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C, onCare:function(item){setCareSuggestion(item);setActiveTab("care");} }) },
           { key: "organizer", label: "✨ " + t("tabOrganizer"), children: h(OrganizerTab, { t:t, C:C, onApplied:function(){setRevision(function(v){return v+1;});api.setup().then(setSetupData).catch(function(error){console.warn("[companion-core] setup refresh failed",error);});} }) },
           { key: "agents", label: "🤖 " + t("tabAgents"), children: h(AgentsTab, { t:t, C:C }) },
           { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
+          {key:'timeline',label:'📖 '+t('tabTimeline'),children:h(TimelineTab,{t:t,C:C,revision:revision,onApplied:function(){setRevision(function(v){return v+1;});}})},
+          {key:'milestones',label:'💕 '+t('bfMilestones'),children:h(MilestonesTab,{t:t,C:C,navigate:setActiveTab})},
+          {key:'care',label:'📣 '+t('tabCare'),children:h(CareTab,{t:t,C:C,suggestion:careSuggestion})},
           { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },
         ],
       }));
