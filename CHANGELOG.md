@@ -2,6 +2,8 @@
 
 - 修复 Actions artifact 双层 ZIP 导致安装报「No plugin.json found」的问题：`scripts/package.py` 新增 `--dir` 输出解包目录，CI 额外发布 `companion-core-<版本>-installable` artifact，下载解压后 plugin.json 即在根目录、可直接安装。
 - 原 ZIP artifact 与 Release 发布流程不变。
+- 安装包瘦身：删除仓库中的 待办清单.md、HOST_VALIDATION.md（git 历史仍可查），ROADMAP.md 保留在仓库；三者均不再随包分发，安装包只含插件本体与用户向文档。
+- tests/ 目录保留，CI 发布前验证流程不变；测试本就不进入安装包。
 
 # v2.8.2
 

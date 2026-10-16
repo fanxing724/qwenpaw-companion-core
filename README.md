@@ -182,7 +182,7 @@ API 前缀同现有宿主模式：
 | `/organizer/backfill/preview` | POST | `{review_id, confirmed:true}`，发送已审阅请求或生成本地称呼预览；不写数据 |
 | `/organizer/backfill/apply` | POST | `{preview_id}`，检查冲突、备份后写入 |
 
-按难度推进的设计与当前状态见 [ROADMAP.md](ROADMAP.md)。2.8.1 已实现历史归档、日记/那年今日/大事记、模型发现、计分、首见与可选关怀任务；完整规则与限制见 [FEATURES.md](FEATURES.md)，真实宿主验收见 [HOST_VALIDATION.md](HOST_VALIDATION.md)。所有自动功能需要显式开启；未完成真机验证前保持 2.8.x。
+按难度推进的设计与当前状态见 [ROADMAP.md](ROADMAP.md)。2.8.1 已实现历史归档、日记/那年今日/大事记、模型发现、计分、首见与可选关怀任务；完整规则与限制见 [FEATURES.md](FEATURES.md)。所有自动功能需要显式开启；未完成真机验证前保持 2.8.x。
 
 ## 🗂 数据存储
 
@@ -315,8 +315,6 @@ python3 scripts/package.py
 - 推送 `v<版本号>` 标签：核对标签与 `plugin.json` 版本，验证并打包，自动发布 GitHub Release。
 - Release 页面展示 `RELEASE.md`，附件仅提供插件 ZIP；README 和 LICENSE 保留在仓库及 ZIP 内。
 - 安装 ZIP 顶层为 `companion-core/`，其中包含描述清单、README、发布说明、更新日志和 MIT 协议；缺少必要文件会直接阻止打包。
-
-后续接续与真机验收：[待办清单](待办清单.md)。
 
 ## 运行依赖
 

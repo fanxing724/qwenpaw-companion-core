@@ -60,4 +60,4 @@
 
 新增 history/、care-state.json、feature-state.json 和 insight-backups/ 都在实际插件数据目录下，文件以 0600 原子替换；不新增常驻进程或独立调度器。完整备份必须包含这些文件，勿提交公开 Git。历史与私密轮换备份不能替代异机备份。
 
-当前证据是本地自动测试、浏览器模拟与官方 CronJobSpec 模型校验。真实宿主重载、console 降级、真实渠道成功/失败、静默跨夜等，按 [HOST_VALIDATION.md](HOST_VALIDATION.md) 验证；这些未通过之前继续留在 2.8.x。
+当前证据是本地自动测试、浏览器模拟与官方 CronJobSpec 模型校验。真实宿主重载、console 降级、真实渠道成功/失败、静默跨夜等，按真机验收清单逐项验证；这些未通过之前继续留在 2.8.x。

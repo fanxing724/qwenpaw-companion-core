@@ -8,8 +8,10 @@ import zipfile
 root = Path(__file__).resolve().parents[1]
 manifest = json.loads((root / 'plugin.json').read_text(encoding='utf-8'))
 version = manifest['version']
+# Ship only files useful to end users; dev-process docs (ROADMAP.md and
+# friends) stay in the repo but out of the installable package.
 required = ['plugin.py', 'organizer.py', 'file_backfill.py', 'companion_features.py', 'care.py', 'plugin.json', 'README.md',
-            'RELEASE.md', 'ROADMAP.md', 'FEATURES.md', 'HOST_VALIDATION.md', '待办清单.md', 'SKILL.md', 'CHANGELOG.md', 'LICENSE']
+            'RELEASE.md', 'FEATURES.md', 'SKILL.md', 'CHANGELOG.md', 'LICENSE']
 for name in required + list(manifest['entry'].values()):
     file = root / name
     if not file.is_file() or not file.stat().st_size:
