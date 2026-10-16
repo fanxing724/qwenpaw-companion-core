@@ -76,7 +76,7 @@ TOOL_NAMES = tuple(item["name"] for item in json.loads(
 _TIMEZONE_NAME = os.environ.get("QWENPAW_COMPANION_TIMEZONE", "Asia/Shanghai")
 _TIMEZONE = ZoneInfo(_TIMEZONE_NAME)
 
-_binding_lock = threading.Lock()
+_binding_lock = threading.RLock()
 _call_history = {}  # Bounded latest call per agent; no conversation content stored.
 
 

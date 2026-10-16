@@ -50,16 +50,14 @@ def _entries(schedule):
 def evolve(state, schedule, now, auto):
     """Return {field: (value, reason)} for eligible fields that would change.
 
-    Eligible = empty, or previously written by this engine, or stale date.
+    Eligible = empty, or previously written by this engine.
     Everything is a deterministic function of (now, today's schedule).
     """
-    today = now.date().isoformat()
     auto = set(auto or ())
-    stale = state.get("date") not in ("", today)
 
     def eligible(field):
         value = state.get(field)
-        return stale or field in auto or value is None or value == ""
+        return field in auto or value is None or value == ""
 
     entries = _entries(schedule)
     if not entries:
@@ -167,11 +165,12 @@ class Life:
                 self.write(cfg)
 
     def preview(self):
+        cfg = self.read()
         with self.c["_lock"]:
             state = self.c["_read_yaml"](self.c["_DATA_DIR"] / "state.yaml") or {}
             schedule = self.c["_read_yaml"](self.c["_DATA_DIR"] / "schedule.yaml") or {}
             now = self.c["_now"]()
-            changes = evolve(state, schedule, now, self.read().get("auto", []))
+            changes = evolve(state, schedule, now, cfg.get("auto", []))
         return {field: {"value": value, "reason": reason}
                 for field, (value, reason) in changes.items()}
 
@@ -194,7 +193,7 @@ class Life:
                         return None
                     merged = {**state,
                               **{field: value for field, (value, _) in changes.items()},
-                              "date": state.get("date") or now.date().isoformat()}
+                              "date": now.date().isoformat()}
                     self.c["_write_yaml"](self.c["_DATA_DIR"] / "state.yaml", merged)
                 cfg["auto"] = sorted(set(cfg.get("auto", [])) | set(changes))
                 cfg["evolved_at"] = now.isoformat(timespec="seconds")

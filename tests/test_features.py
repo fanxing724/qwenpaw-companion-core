@@ -333,6 +333,9 @@ def test_anniversary_filter_explicit_retry_and_uninstall_isolation(care_host):
     assert client.post(prefix+'/care/retry',json={'agent_id':'alice','event_id':queue[0]['id'],'confirmed':True}).status_code==200
     jobs['unrelated']=NS(id='unrelated',meta={'owner':'another-plugin'})
     asyncio.run(module.care.uninstall())
+    assert any(key.startswith('companion-care-') for key in jobs)
+    assert module.care.settings('alice')['enabled'] is True
+    asyncio.run(module.care.uninstall(delete_files=True))
     assert list(jobs)==['unrelated'] and module.care.settings('alice')['enabled'] is False
 
 
