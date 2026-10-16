@@ -57,7 +57,7 @@ qwenpaw plugin install /path/to/companion-core-2.8.2.zip
 qwenpaw plugin install --force /path/to/companion-core
 ```
 
-源码打包：`python3 scripts/package.py`，输出到 `dist/`，ZIP 内保留 `companion-core/` 顶层目录。
+源码打包：`python3 scripts/package.py`，输出到 `dist/`，ZIP 内保留 `companion-core/` 顶层目录；追加 `--dir` 可同时在 `dist/companion-core/` 生成解包目录（CI 用它发布单层包裹的 `-installable` artifact）。
 
 ### 首次使用引导
 
@@ -311,7 +311,7 @@ python3 scripts/package.py
 
 ## 自动打包与发布
 
-- 推送 `main` 或手动运行 **Package and Release**：验证后生成 ZIP，可在对应 Actions 运行的 Artifacts 中下载。
+- 推送 `main` 或手动运行 **Package and Release**：验证后生成 ZIP，可在对应 Actions 运行的 Artifacts 中下载。日常测试请下载 `companion-core-<版本>-installable`，解压即可直接安装；`companion-core-<版本>` artifact 会被 GitHub 再打包一层（双层 ZIP），直接上传安装会提示找不到 plugin.json，需先解出内层 ZIP。
 - 推送 `v<版本号>` 标签：核对标签与 `plugin.json` 版本，验证并打包，自动发布 GitHub Release。
 - Release 页面展示 `RELEASE.md`，附件仅提供插件 ZIP；README 和 LICENSE 保留在仓库及 ZIP 内。
 - 安装 ZIP 顶层为 `companion-core/`，其中包含描述清单、README、发布说明、更新日志和 MIT 协议；缺少必要文件会直接阻止打包。

@@ -1,3 +1,8 @@
+# 未发布（构建/CI，插件本体不变）
+
+- 修复 Actions artifact 双层 ZIP 导致安装报「No plugin.json found」的问题：`scripts/package.py` 新增 `--dir` 输出解包目录，CI 额外发布 `companion-core-<版本>-installable` artifact，下载解压后 plugin.json 即在根目录、可直接安装。
+- 原 ZIP artifact 与 Release 发布流程不变。
+
 # v2.8.2
 
 - 安装包不再包含 requirements.txt，开发依赖改用 requirements-dev.txt；使用 QwenPaw 宿主已有 PyYAML。

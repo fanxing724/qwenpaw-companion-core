@@ -41,12 +41,22 @@ jobs:
           node --check ui/index.js
           node tests/frontend.cjs
       - name: Package plugin
-        run: python3 scripts/package.py dist
+        run: python3 scripts/package.py dist --dir
       - name: Upload installable package
         uses: actions/upload-artifact@v4
         with:
           name: companion-core-${{ steps.version.outputs.version }}
           path: dist/companion-core-${{ steps.version.outputs.version }}.zip
+          if-no-files-found: error
+      # GitHub re-zips every artifact on download, so the ZIP artifact above
+      # arrives double-wrapped and cannot be installed directly. Upload the
+      # unpacked tree as well: its download is wrapped only once and carries
+      # plugin.json at the archive root, ready for QwenPaw to install.
+      - name: Upload single-wrap installable files
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-core-${{ steps.version.outputs.version }}-installable
+          path: dist/companion-core/
           if-no-files-found: error
 
   release:
