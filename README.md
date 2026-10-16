@@ -35,7 +35,8 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
-- v2.8.1：新增每日历史归档、日记时间线、持久化首见、可解释计分、宿主模型发现与可选关怀任务；版本锁定 2.8.x，真机验收完成后再升 2.9.0。
+- v2.9.0：稳定测试版，真机验收完成；修复 Actions artifact 双层 ZIP 无法直装的问题，安装包瘦身至 19 个文件，插件功能与 2.8.2 一致。
+- v2.8.1：新增每日历史归档、日记时间线、持久化首见、可解释计分、宿主模型发现与可选关怀任务。
 - v2.8.0：新增本地称呼推断与手动文件回填基础。
 - v2.7.0：新增首次使用引导，将模型配置入口改名为“AI 设置”，新用户以空白记录开始。
 - v2.6.0：新增独立模型聊天整理，每模块 API/模型/提示词配置、手动预览写入及可选自动整理。
@@ -49,10 +50,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.8.2.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.9.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.8.2.zip
+qwenpaw plugin install /path/to/companion-core-2.9.0.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -182,7 +183,7 @@ API 前缀同现有宿主模式：
 | `/organizer/backfill/preview` | POST | `{review_id, confirmed:true}`，发送已审阅请求或生成本地称呼预览；不写数据 |
 | `/organizer/backfill/apply` | POST | `{preview_id}`，检查冲突、备份后写入 |
 
-按难度推进的设计与当前状态见 [ROADMAP.md](ROADMAP.md)。2.8.1 已实现历史归档、日记/那年今日/大事记、模型发现、计分、首见与可选关怀任务；完整规则与限制见 [FEATURES.md](FEATURES.md)。所有自动功能需要显式开启；未完成真机验证前保持 2.8.x。
+按难度推进的设计与当前状态见 [ROADMAP.md](ROADMAP.md)。2.8.1 已实现历史归档、日记/那年今日/大事记、模型发现、计分、首见与可选关怀任务；完整规则与限制见 [FEATURES.md](FEATURES.md)。所有自动功能需要显式开启。
 
 ## 🗂 数据存储
 
