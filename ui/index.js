@@ -88,6 +88,13 @@
       loadFailed: "加载失败: {error}", saveFailed: "保存失败: {error}", deleteFailed: "删除失败: {error}",
       fDate: "日期", fMood: "心情", fEnergy: "精力", fSleep: "睡眠",
       fDream: "梦境", fHealth: "健康", fHunger: "饱腹", fNote: "备注",
+      lifeTitle: "生活引擎", lifeHint: "开启后，睡眠/饥饿/精力会按当前时间与今日日程自动演化；你手动改的字段不会被覆盖。",
+      lifeOn: "自动演化中", lifeOff: "未开启", lifePreview: "下一步将变为", lifeNoChange: "当前无需演化",
+      lifeEvolvedAt: "最近演化", lifeAutoFields: "自动管理的字段", lifeNoSchedule: "填写今日日程后才会演化，不编造状态。",
+      tabCheckup: "检查", checkupHint: "自动体检安装与配置状态；能自动修复的可一键修复。",
+      checkupOk: "正常", checkupWarn: "建议处理", checkupError: "需要修复",
+      checkupFix: "一键修复", checkupAskAi: "发给 Agent 修复", checkupGoto: "去设置",
+      checkupFixed: "已修复", checkupFixFailed: "修复失败: {error}", checkupCopied: "修复指令已复制，粘贴到 Agent 聊天中即可",
       noState: "还没有状态数据", noPlan: "今天还没有安排", noDreams: "还没有梦境记录",
       dreamOf: "{date} 的梦", newDream: "写梦",
       dreamContent: "梦境内容", dreamDate: "日期（留空为今天）",
@@ -160,6 +167,13 @@
       loadFailed: "Load failed: {error}", saveFailed: "Save failed: {error}", deleteFailed: "Delete failed: {error}",
       fDate: "Date", fMood: "Mood", fEnergy: "Energy", fSleep: "Sleep",
       fDream: "Dream", fHealth: "Health", fHunger: "Hunger", fNote: "Note",
+      lifeTitle: "Life Engine", lifeHint: "When enabled, sleep/hunger/energy evolve automatically with the clock and today's schedule; fields you edit by hand are never overwritten.",
+      lifeOn: "Auto-evolving", lifeOff: "Off", lifePreview: "Next evolution", lifeNoChange: "Nothing to evolve right now",
+      lifeEvolvedAt: "Last evolved", lifeAutoFields: "Auto-managed fields", lifeNoSchedule: "Evolution needs today's schedule; nothing is fabricated.",
+      tabCheckup: "Checkup", checkupHint: "Inspects installation and configuration; auto-fixable items can be repaired in one click.",
+      checkupOk: "OK", checkupWarn: "Suggested", checkupError: "Action needed",
+      checkupFix: "Fix now", checkupAskAi: "Send to Agent", checkupGoto: "Open settings",
+      checkupFixed: "Fixed", checkupFixFailed: "Fix failed: {error}", checkupCopied: "Repair instruction copied; paste it into the Agent chat",
       noState: "No state data yet", noPlan: "Nothing planned yet", noDreams: "No dreams recorded yet",
       dreamOf: "Dream of {date}", newDream: "New Dream",
       dreamContent: "Dream content", dreamDate: "Date (leave empty for today)",
@@ -391,6 +405,10 @@
     organizerApply: function (id) { return apiFetch("/companion-core/organizer/apply", {method:"POST",body:{preview_id:id}}); },
     agents: function () { return apiFetch("/companion-core/agents"); },
     bindAgent: function (id, enabled) { return apiFetch("/companion-core/agents/" + encodeURIComponent(id) + "/binding", {method:"PUT", body:{enabled:enabled}}); },
+    getLife: function () { return apiFetch("/companion-core/life"); },
+    putLife: function (enabled) { return apiFetch("/companion-core/life", { method: "PUT", body: { enabled: enabled } }); },
+    getCheckup: function () { return apiFetch("/companion-core/checkup"); },
+    fixCheckup: function (body) { return apiFetch("/companion-core/checkup/fix", { method: "POST", body: body }); },
     health: function () { return apiFetch("/companion-core/health").then(function(data){BUSINESS_TIMEZONE=data.timezone||BUSINESS_TIMEZONE;BUSINESS_DAY=data.today||BUSINESS_DAY;return data;}); },
   };
 
@@ -516,6 +534,7 @@
           typeof data.energy === "number" ? h(Progress, { percent: energy, strokeColor: C.accent }) : h("p",{style:{color:C.sub}},t("noScore")),
           h(Field, { label: t("fDream"), C: C }, data.dream || "—"),
           h(Field, { label: t("fNote"), C: C }, data.note || "—"))),
+      h(LifeCard, { t: t, C: C, onChanged: s.retry }),
       h(Modal, {
         open: editing, title: t("edit"), okText: t("save"), cancelText: t("cancel"),
         okButtonProps: { loading: saving },
@@ -529,6 +548,112 @@
         h(EditorRow, { label: t("fDream"), C: C }, h(Input, { value: form.dream, onChange: function (e) { setField("dream", e.target.value); } })),
         h(EditorRow, { label: t("fNote"), C: C }, h(TextArea, { rows: 2, value: form.note, onChange: function (e) { setField("note", e.target.value); } })),
         h(EditorRow, { label: t("fEnergy"), C: C }, h(InputNumber, { min: 0, max: 100, value: form.energy, onChange: function (v) { setField("energy", v); } }))) : null));
+  }
+
+  // ── Life engine card (shown on the State tab) ─────────────────────
+
+  function LifeCard(props) {
+    var t = props.t, C = props.C;
+    var s = useAsync(api.getLife, []);
+    var _b = useState(false), busy = _b[0], setBusy = _b[1];
+
+    if (s.loading) return null;
+    if (s.error) return null;
+    var data = s.data || {};
+    var preview = data.preview || {};
+    var previewKeys = Object.keys(preview);
+
+    function toggle(value) {
+      if (busy) return;
+      setBusy(true);
+      api.putLife(value)
+        .then(function () { message.success(t("saved")); s.retry(); if (props.onChanged) props.onChanged(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setBusy(false); });
+    }
+
+    return h("div", { style: Object.assign({}, panelStyle(C), { marginTop: 16 }) },
+      h("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+        h("strong", null, "⏳ " + t("lifeTitle")),
+        h(Switch, { size: "small", checked: !!data.enabled, disabled: busy, onChange: toggle }),
+        h(Tag, { color: data.enabled ? "green" : "default" }, data.enabled ? t("lifeOn") : t("lifeOff"))),
+      h("p", { style: { color: C.sub, fontSize: 13 } }, t("lifeHint")),
+      data.enabled ? h("div", null,
+        previewKeys.length ? h("div", null,
+          h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 4 } }, t("lifePreview")),
+          previewKeys.map(function (key) {
+            return h("p", { key: key, style: { margin: "4px 0" } },
+              h(Tag, { color: "blue" }, key), String(preview[key].value), " ",
+              h("small", { style: { color: C.sub } }, preview[key].reason));
+          })) : h("p", { style: { color: C.sub, fontSize: 13 } }, t("lifeNoChange")),
+        h("p", { style: { color: C.sub, fontSize: 12 } },
+          t("lifeEvolvedAt") + ": " + (data.evolved_at || "—") + " · " +
+          t("lifeAutoFields") + ": " + ((data.auto_fields || []).join(", ") || "—")))
+        : h("p", { style: { color: C.sub, fontSize: 12 } }, t("lifeNoSchedule")));
+  }
+
+  // ── Tab: Checkup ───────────────────────────────────────────────────
+
+  function CheckupTab(props) {
+    var t = props.t, C = props.C;
+    var s = useAsync(api.getCheckup, []);
+    var _b = useState(""), fixing = _b[0], setFixing = _b[1];
+
+    if (s.loading) return h(LoadingBlock, { t: t, C: C });
+    if (s.error) return h(ErrorBlock, { t: t, C: C, error: s.error, onRetry: s.retry });
+    var data = s.data || { items: [], summary: {} };
+    var colors = { ok: "green", warn: "orange", error: "red" };
+    var labels = { ok: t("checkupOk"), warn: t("checkupWarn"), error: t("checkupError") };
+
+    function fix(item) {
+      if (fixing) return;
+      setFixing(item.id);
+      api.fixCheckup({ item: item.fix.item, agent_id: item.fix.agent_id || "" })
+        .then(function (res) {
+          if (res && res.fixed) { message.success(t("checkupFixed") + "：" + (res.message || "")); s.retry(); }
+          else { message.warning((res && res.message) || t("checkupFixFailed", { error: "" })); }
+        })
+        .catch(function (e) { message.error(t("checkupFixFailed", { error: e.message })); })
+        .then(function () { setFixing(""); });
+    }
+
+    function askAi(item) {
+      var text = item.fix.prompt || item.detail;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { message.success(t("checkupCopied")); });
+      } else {
+        window.prompt(t("checkupAskAi"), text);
+      }
+    }
+
+    return h("div", null,
+      h(Toolbar, {
+        left: h("span", { style: { color: C.sub, fontSize: 13 } }, t("checkupHint")),
+        right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
+      }),
+      h("div", { style: { display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" } },
+        ["ok", "warn", "error"].map(function (key) {
+          return h(Tag, { key: key, color: colors[key] }, labels[key] + " " + (data.summary[key] || 0));
+        })),
+      data.items.map(function (item) {
+        return h("div", { key: item.id, style: Object.assign({}, panelStyle(C), { marginBottom: 12 }) },
+          h("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+            h(Tag, { color: colors[item.status] || "default" }, labels[item.status] || item.status),
+            h("strong", null, item.label),
+            h("span", { style: { color: C.sub, fontSize: 13 } }, item.detail),
+            h("span", { style: { flex: 1 } }),
+            item.fix && item.fix.kind === "auto" ? h(Button, {
+              size: "small", type: "primary", loading: fixing === item.id,
+              onClick: function () { fix(item); },
+            }, t("checkupFix")) : null,
+            item.fix && item.fix.kind === "link" ? h(Button, {
+              size: "small",
+              onClick: function () { if (props.navigate) props.navigate(item.fix.target === "settings" ? "organizer" : item.fix.target); },
+            }, t("checkupGoto")) : null,
+            item.fix && item.fix.kind === "ask_ai" ? h(Button, {
+              size: "small", onClick: function () { askAi(item); },
+            }, t("checkupAskAi")) : null));
+      }));
   }
 
   // ── Tab: Schedule ────────────────────────────────────────────────────
@@ -1440,6 +1565,7 @@
           {key:'timeline',label:'📖 '+t('tabTimeline'),children:h(TimelineTab,{t:t,C:C,revision:revision,onApplied:function(){setRevision(function(v){return v+1;});}})},
           {key:'milestones',label:'💕 '+t('bfMilestones'),children:h(MilestonesTab,{t:t,C:C,navigate:setActiveTab})},
           {key:'care',label:'📣 '+t('tabCare'),children:h(CareTab,{t:t,C:C,suggestion:careSuggestion})},
+          {key:'checkup',label:'🩺 '+t('tabCheckup'),children:h(CheckupTab,{t:t,C:C,navigate:setActiveTab})},
           { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },
         ],
       }));

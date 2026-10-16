@@ -340,6 +340,9 @@ router = APIRouter()
 @router.get("/state", response_model=StateModel)
 def get_state():
     """获取当前状态。"""
+    life = globals().get("life")
+    if life is not None:
+        life.maybe_evolve()
     with _lock:
         data = _read_yaml(_DATA_DIR / "state.yaml")
     if not data:
@@ -350,12 +353,16 @@ def get_state():
 @router.put("/state", response_model=StateModel)
 def update_state(state: StateModel):
     """更新状态（增量合并，仅覆盖请求中显式提供的字段）。"""
+    explicit = state.model_dump(exclude_unset=True)
     with _lock:
         path = _DATA_DIR / "state.yaml"
         existing = _read_yaml(path)
-        merged = {**existing, **state.model_dump(exclude_unset=True)}
+        merged = {**existing, **explicit}
         merged["date"] = state.date or _today_str()
         _write_yaml(path, merged)
+    life = globals().get("life")
+    if life is not None:
+        life.mark_manual(explicit.keys())
     return merged
 
 
@@ -778,6 +785,7 @@ def health():
         if dreams_dir.exists()
         else 0,
         "notes_count": len(_read_notes()),
+        "life": globals()["life"].summary() if "life" in globals() else {"enabled": False, "evolved_at": ""},
     }
 
 
@@ -828,8 +836,17 @@ def companion_agents():
     return {"supported": True, "agents": rows, "tools": list(TOOL_NAMES)}
 
 
-@router.put("/agents/{agent_id}/binding")
-async def set_companion_binding(agent_id: str, payload: AgentBindingUpdate, request: Request):
+def _request_agent_reload(request, agent_id):
+    try:
+        from qwenpaw.app.utils import schedule_agent_reload
+        return schedule_agent_reload(request, agent_id) is True
+    except Exception:
+        logger.exception("Companion binding saved; agent reload unavailable")
+        return False
+
+
+def _apply_binding(agent_id, enabled):
+    """Enable/disable companion tools for an agent (no reload; caller decides)."""
     if app is None:
         raise HTTPException(status_code=503, detail="当前宿主未注册 AI 工具，无法绑定")
     load_config, load_agent_config, save_agent_config, tool_class = _host_config_api()
@@ -838,7 +855,7 @@ async def set_companion_binding(agent_id: str, payload: AgentBindingUpdate, requ
         if agent_id not in config.agents.profiles:
             raise HTTPException(status_code=404, detail="智能体不存在")
         ref = config.agents.profiles[agent_id]
-        if payload.enabled and not getattr(ref, "enabled", True):
+        if enabled and not getattr(ref, "enabled", True):
             raise HTTPException(status_code=409, detail="请先在 QwenPaw 中启用该智能体")
         agent_config = load_agent_config(agent_id)
         if agent_config.tools is None:
@@ -846,18 +863,110 @@ async def set_companion_binding(agent_id: str, payload: AgentBindingUpdate, requ
         entries = agent_config.tools.builtin_tools
         for name in TOOL_NAMES:
             if name not in entries:
-                entries[name] = tool_class(name=name, enabled=payload.enabled, config={})
+                entries[name] = tool_class(name=name, enabled=enabled, config={})
             else:
-                entries[name].enabled = payload.enabled
+                entries[name].enabled = enabled
         save_agent_config(agent_id, agent_config)
-    reload_scheduled = False
+        return _agent_binding_row(agent_id, ref, load_agent_config(agent_id))
+
+
+# ── 技能随绑定分发 ───────────────────────────────────────────────────
+
+_SKILL_NAME = "companion_core"
+
+
+def _workspace_dir(agent_id):
     try:
-        from qwenpaw.app.utils import schedule_agent_reload
-        reload_scheduled = schedule_agent_reload(request, agent_id) is True
-    except Exception:
-        logger.exception("Companion binding saved; agent reload unavailable")
-    row = _agent_binding_row(agent_id, ref, load_agent_config(agent_id))
-    return {"agent": row, "reload_scheduled": reload_scheduled,
+        from qwenpaw.constant import WORKING_DIR
+    except Exception:  # noqa: BLE001
+        return None
+    path = Path(WORKING_DIR) / "workspaces" / agent_id
+    return path if path.is_dir() else None
+
+
+def _skill_status(agent_id):
+    workspace = _workspace_dir(agent_id)
+    if workspace is None:
+        return {"status": "unknown", "reason": "无法定位智能体工作区"}
+    target = workspace / "skills" / _SKILL_NAME / "SKILL.md"
+    if not target.exists():
+        return {"status": "missing", "enabled": False}
+    try:
+        same = target.read_text(encoding="utf-8") == (_PLUGIN_DIR / "SKILL.md").read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        return {"status": "unknown", "enabled": False, "reason": "技能文件读取失败"}
+    enabled = False
+    try:
+        data = json.loads((workspace / "skill.json").read_text(encoding="utf-8"))
+        enabled = bool(data.get("skills", {}).get(_SKILL_NAME, {}).get("enabled"))
+    except Exception:  # noqa: BLE001
+        pass
+    if not same:
+        return {"status": "conflict", "enabled": enabled,
+                "reason": "技能文件与扩展自带版本不一致（可能被自定义过），未改动"}
+    return {"status": "installed", "enabled": enabled}
+
+
+def _skill_set_enabled(workspace, enabled):
+    manifest = workspace / "skill.json"
+    data = {"schema_version": "workspace-skill-manifest.v1", "version": 0, "skills": {}}
+    if manifest.exists():
+        try:
+            loaded = json.loads(manifest.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict) and isinstance(loaded.get("skills"), dict):
+                data.update(loaded)
+        except Exception:  # noqa: BLE001
+            logger.warning("[companion] Unreadable skill manifest for %s; not touching it", workspace.name)
+            return
+    if enabled:
+        entry = data["skills"].get(_SKILL_NAME) or {
+            "enabled": True, "channels": ["all"], "preload": False, "source": "customized",
+            "requirements": {"require_bins": [], "require_envs": [], "require_mcps": []},
+            "config": {},
+        }
+        entry["enabled"] = True
+        entry["updated_at"] = _now_ts()
+        data["skills"][_SKILL_NAME] = entry
+    else:
+        data["skills"].pop(_SKILL_NAME, None)
+    data["version"] = int(datetime.now().timestamp() * 1000)
+    _write_json(manifest, data)
+
+
+def _skill_sync(agent_id, enabled):
+    """Install/enable the bundled skill on bind; remove only byte-identical copies on unbind."""
+    workspace = _workspace_dir(agent_id)
+    if workspace is None:
+        return {"status": "skipped", "reason": "无法定位智能体工作区"}
+    status = _skill_status(agent_id)
+    if enabled:
+        if status["status"] == "conflict":
+            return status
+        if status["status"] == "missing":
+            target_dir = workspace / "skills" / _SKILL_NAME
+            target_dir.mkdir(parents=True, exist_ok=True)
+            _write_text(target_dir / "SKILL.md", (_PLUGIN_DIR / "SKILL.md").read_text(encoding="utf-8"))
+        _skill_set_enabled(workspace, True)
+        return {"status": "installed"}
+    if status["status"] == "installed":
+        _skill_set_enabled(workspace, False)
+        try:
+            (workspace / "skills" / _SKILL_NAME / "SKILL.md").unlink()
+            (workspace / "skills" / _SKILL_NAME).rmdir()
+        except OSError:
+            pass
+        return {"status": "removed"}
+    if status["status"] == "conflict":
+        return {"status": "kept", "reason": status["reason"]}
+    return {"status": "missing"}
+
+
+@router.put("/agents/{agent_id}/binding")
+async def set_companion_binding(agent_id: str, payload: AgentBindingUpdate, request: Request):
+    row = _apply_binding(agent_id, payload.enabled)
+    skill = _skill_sync(agent_id, payload.enabled)
+    reload_scheduled = _request_agent_reload(request, agent_id)
+    return {"agent": row, "skill": skill, "reload_scheduled": reload_scheduled,
             "message": "配置已保存，已请求宿主重新加载；请在新对话中验证实际调用。" if reload_scheduled else "配置已保存；请在宿主重新加载智能体或重启 QwenPaw 后再验证。"}
 
 
@@ -928,6 +1037,9 @@ def _text_response(text):
 )
 async def companion_get_state():
     """读取当前状态并返回自然语言描述。"""
+    life = globals().get("life")
+    if life is not None:
+        life.maybe_evolve()
     with _lock:
         data = _read_yaml(_DATA_DIR / "state.yaml")
     if not data:
@@ -1058,6 +1170,9 @@ async def companion_update_state(
         existing = _read_yaml(path)
         merged = {**existing, **patch, "date": _today_str()}
         _write_yaml(path, merged)
+    life = globals().get("life")
+    if life is not None:
+        life.mark_manual(patch.keys())
     fields = "、".join(patch.keys())
     return _text_response(f"已更新状态：{fields}。")
 
@@ -1227,14 +1342,18 @@ def complete_setup(payload: SetupProfile):
 
 
 # Feature modules share the data lock and the host's existing lifecycle.
-for _feature_name in ("companion_features", "care"):
+for _feature_name in ("companion_features", "care", "life", "checkup"):
     _spec = _importlib_util.spec_from_file_location("companion_"+_feature_name, _PLUGIN_DIR / (_feature_name+".py"))
     _module = _importlib_util.module_from_spec(_spec)
     _spec.loader.exec_module(_module)
     if _feature_name == "companion_features":
         features = _module.install(router, organizer)
-    else:
+    elif _feature_name == "care":
         care = _module.install(router, organizer, features)
+    elif _feature_name == "life":
+        life = _module.install(router, organizer)
+    else:
+        checkup = _module.install(router, organizer, life)
 
 # Standard router loaders do not invoke PawApp lifecycle hooks, even
 # when the optional SDK is installed. Initialize only missing files.

@@ -495,7 +495,11 @@ class Care:
         return {'state':'queued','event':event,'notice':'已加入队列；启用关怀或首见提示后按规则处理，不会立即发送。'}
 
 
-    async def uninstall(self,**_kwargs):
+    async def uninstall(self,delete_files=False,**_kwargs):
+        # 覆盖升级/热重载也会触发本钩子（delete_files=False）；
+        # 只有用户显式卸载（delete_files=True）才停用关怀配置并删除关怀任务，
+        # 否则升级后关怀设置被静默重置、任务被误删。
+        if not delete_files:return
         with self.lock:
             data=self.read()
             configured=[key for key,cfg in data.get('settings',{}).items() if cfg.get('enabled')]

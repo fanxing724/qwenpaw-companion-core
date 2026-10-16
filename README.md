@@ -35,6 +35,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
+- v2.10.0：生活引擎（状态自动演化，可选）、技能随绑定自动安装、检查界面（自检与一键修复）。
 - v2.9.0：稳定测试版，真机验收完成；修复 Actions artifact 双层 ZIP 无法直装的问题，安装包瘦身至 19 个文件，插件功能与 2.8.2 一致。
 - v2.8.1：新增每日历史归档、日记时间线、持久化首见、可解释计分、宿主模型发现与可选关怀任务。
 - v2.8.0：新增本地称呼推断与手动文件回填基础。
@@ -50,10 +51,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.9.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.10.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.9.0.zip
+qwenpaw plugin install /path/to/companion-core-2.10.0.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```

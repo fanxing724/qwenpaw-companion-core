@@ -26,7 +26,7 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   const route = calls.find(c => c[0] === 'route')[1][0];
   assert.equal(route.id, 'companion-core.home');
   const tree = route.component();
-  assert.equal(tree.children.at(-1).props.items.length, 14);
+  assert.equal(tree.children.at(-1).props.items.length, 15);
   effects[0]();
   await new Promise(resolve => setImmediate(resolve));
   const base = mode === 'base-path' ? '/paw/api' : '/api';
@@ -38,7 +38,7 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   assert.equal(requests.at(-1), base + mount + '/companion-core/state', mode);
   assert.equal(requests.length, 4, 'one discovery probe and no mutation retries');
 }
-console.log('Frontend: 7 host modes, routes, fourteen tabs and health API passed');
+console.log('Frontend: 7 host modes, routes, fifteen tabs and health API passed');
 
 // Evaluate date helpers in isolation without adding production globals.
 const helperContext = {window:{QwenPaw:{host:{React:{createElement(){}, useState(){}, useEffect(){}},antd:{Input:{}}}}},console};
