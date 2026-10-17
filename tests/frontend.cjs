@@ -27,7 +27,8 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   assert.equal(route.id, 'companion-core.home');
   const tree = route.component();
   // Default shows every tab; collapsing is an explicit user choice (localStorage).
-  assert.equal(tree.children.at(-1).props.items.length, 15);
+  const tabsNode = tree.children.find(c => c && c.props && Array.isArray(c.props.items));
+  assert.equal(tabsNode.props.items.length, 15);
   effects[0]();
   await new Promise(resolve => setImmediate(resolve));
   const base = mode === 'base-path' ? '/paw/api' : '/api';
