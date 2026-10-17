@@ -2,10 +2,10 @@
   "id": "companion-core",
   "name": "陪伴核心",
   "version": "2.10.6",
-  "description": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期，支持搜索编辑、备份恢复和 REST API。",
+  "description": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期；生活引擎按作息自动演化状态并跨日生成日程；检查页自检与一键修复；支持搜索编辑、备份恢复、反馈入口与 REST API。",
   "description_i18n": {
-    "zh-CN": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期，支持搜索编辑、备份恢复和 REST API。",
-    "en-US": "Companion dashboard with daily overview, state, schedules, dreams, notes, relationships, important dates, search, editing, backup and REST API."
+    "zh-CN": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期；生活引擎按作息自动演化状态并跨日生成日程；检查页自检与一键修复；支持搜索编辑、备份恢复、反馈入口与 REST API。",
+    "en-US": "All-in-one companion: daily overview, state, schedules, dreams, notes, relationships and important dates; a rule-based life engine evolves state from your routine and generates each day's schedule; self-check page with one-click repairs; search, editing, backup/restore, feedback entries and REST API."
   },
   "author": "QwenPaw Community",
   "license": "MIT",
