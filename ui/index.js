@@ -639,7 +639,7 @@
 
     function fixAll() {
       if (fixing) return;
-      var targets = data.items.filter(function (it) { return it.fix && it.fix.kind === "auto"; });
+      var targets = data.items.filter(function (it) { return it.fix && it.fix.kind === "auto" && it.fix.batch !== false; });
       if (!targets.length) { message.info(t("checkupNothingToFix")); return; }
       setFixing("all");
       var done = 0, failed = 0;

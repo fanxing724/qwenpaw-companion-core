@@ -104,15 +104,15 @@ def install(router, owner, life):
                             items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
                                                f"工具已绑定，但技能未就绪：{skill.get('reason', skill['status'])}；"
                                                "一键修复会用扩展自带版本覆盖该副本",
-                                               {"kind": "auto", "item": "update_skill", "agent_id": agent_id}))
+                                               {"kind": "auto", "item": "update_skill", "agent_id": agent_id, "batch": False}))
                         else:
                             items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
                                                f"工具已绑定，但技能未就绪：{skill.get('reason', skill['status'])}",
-                                               {"kind": "auto", "item": "install_skill", "agent_id": agent_id}))
+                                               {"kind": "auto", "item": "install_skill", "agent_id": agent_id, "batch": False}))
                     else:
                         items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
                                            f"未绑定（{row['binding']}），聊天中无法使用陪伴工具",
-                                           {"kind": "auto", "item": "bind_agent", "agent_id": agent_id}))
+                                           {"kind": "auto", "item": "bind_agent", "agent_id": agent_id, "batch": False}))
             except Exception as exc:  # noqa: BLE001
                 items.append(_item("agents", "智能体绑定", "error", f"读取宿主配置失败：{exc}",
                                    {"kind": "ask_ai",
@@ -131,12 +131,16 @@ def install(router, owner, life):
                             best, fstype = mp, parts[2]
             if fstype in {"overlay", "tmpfs", "aufs", "squashfs"}:
                 items.append(_item("storage", "存储持久性", "warn",
-                                   f"数据目录位于易失文件系统（{fstype}）：容器或宿主重置会丢失陪伴数据",
+                                   f"数据目录位于易失文件系统（{fstype}）：容器或宿主重置会丢失陪伴数据。"
+                                   "平台部署必须用 QWENPAW_COMPANION_DATA 锁定持久路径；本地部署可自行备份或忽略",
                                    {"kind": "ask_ai",
                                     "prompt": f"陪伴核心数据目录 {real} 位于易失文件系统 {fstype}。请迁移到持久存储：暂停插件写入后完整复制该目录并保留权限，设置环境变量 QWENPAW_COMPANION_DATA 指向持久路径（或以符号链接回指），重启或重载后核对 /health 的 data_dir；验证通过前保留旧目录以便回退。"}))
             else:
+                locked = fstype in {"nfs", "nfs4", "alinas", "cifs", "fuse.aliyun-nas"} or real.startswith("/run/csi")
+                note = ("平台部署：存储路径已锁定在持久挂载，无需处理"
+                        if locked else "本地部署：无需锁定存储路径，按需自行备份即可")
                 items.append(_item("storage", "存储持久性", "ok",
-                                   f"位于 {fstype or '未知'} 挂载（{best or '/'}），重置不丢"))
+                                   f"位于 {fstype or '未知'} 挂载（{best or '/'}）。{note}"))
         except OSError:
             items.append(_item("storage", "存储持久性", "warn",
                                "无法读取挂载信息，请自行确认数据目录位于持久存储",
