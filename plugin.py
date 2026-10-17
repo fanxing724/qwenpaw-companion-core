@@ -332,7 +332,7 @@ def _seed_data() -> None:
     for path in [*(_DATA_DIR / "dreams").glob("*.md"),
                  *(_DATA_DIR / "history").glob("*.yaml"),
                  *(_DATA_DIR / "organizer-backups").glob("*.json"),
-                 *[_DATA_DIR / name for name in (*yaml_seeds, "notes.json", "setup.json", "organizer-settings.json", "organizer-status.json")]]:
+                 *[_DATA_DIR / name for name in (*yaml_seeds, "routine.yaml", "notes.json", "setup.json", "organizer-settings.json", "organizer-status.json")]]:
         if path.is_file():
             path.chmod(0o600)
 
@@ -397,7 +397,9 @@ def _ensure_today_schedule() -> bool:
     today = _today_str()
     with _lock:
         existing = _read_yaml(_DATA_DIR / "schedule.yaml") or {}
-        if existing.get("date") == today and (existing.get("plan") or []):
+        # 只要日程文件已经属于今天，就以它为准——包括用户故意清空的空白日。
+        # 模板只负责"开启新的一天"，不会把当天已编辑（或已清空）的安排填回去。
+        if existing.get("date") == today:
             return False
         try:
             schedule = ScheduleModel(date=today, plan=plan).model_dump()
@@ -703,6 +705,7 @@ def export_all_data(include_history: bool = False):
             "notes": _read_notes(),
             "relationship": _read_yaml(_DATA_DIR / "relationship.yaml"),
             "dates": _read_yaml(_DATA_DIR / "important_dates.yaml"),
+            "routine": _read_yaml(_ROUTINE_PATH),
             "exported_at": _now_ts(),
         }
         if include_history:
@@ -720,7 +723,8 @@ def import_all_data(data: dict):
     """
     # Reject malformed known sections before touching any user files.
     models = {"state": StateModel, "schedule": ScheduleModel,
-              "relationship": RelationshipModel, "dates": ImportantDatesModel}
+              "relationship": RelationshipModel, "dates": ImportantDatesModel,
+              "routine": RoutineModel}
     known = set(models) | {"notes", "dreams", "history"}
     if not known.intersection(data):
         raise HTTPException(400, "备份不包含可恢复的数据")
@@ -798,6 +802,9 @@ def import_all_data(data: dict):
         if "dates" in data and isinstance(data["dates"], dict):
             _write_yaml(_DATA_DIR / "important_dates.yaml", data["dates"])
             imported.append("dates")
+        if "routine" in data and isinstance(data["routine"], dict):
+            _write_yaml(_ROUTINE_PATH, data["routine"])
+            imported.append("routine")
     return {"status": "ok", "imported": imported, "imported_at": _now_ts()}
 
 

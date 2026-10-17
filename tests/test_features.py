@@ -477,3 +477,41 @@ def test_corrupt_routine_never_breaks_schedule_reads(loaded,monkeypatch):
     life=module.life
     cfg=life.read();cfg['enabled']=True;life.write(cfg)
     assert client.get(prefix+'/state').status_code==200
+
+
+def test_deliberately_empty_day_is_not_refilled_by_routine(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    client.put(prefix+'/routine',json={'enabled':True,'plan':[{'time':'08:00','activity':'起床'}]})
+    assert [x['activity'] for x in client.get(prefix+'/schedule').json()['plan']]==['起床']
+    # 用户故意清空今天 → 不能被模板重新填满
+    client.put(prefix+'/schedule',json={'plan':[]})
+    for _ in range(3):
+        body=client.get(prefix+'/schedule').json()
+        assert body['date']=='2026-10-17' and body['plan']==[]
+    # 但显式「用模板生成今天」仍然可用
+    assert [x['activity'] for x in client.post(prefix+'/routine/apply-today').json()['plan']]==['起床']
+    # 跨日后照常自动物化
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-18')
+    assert client.get(prefix+'/schedule').json()['date']=='2026-10-18'
+
+
+def test_routine_is_included_in_export_and_import(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    client.put(prefix+'/routine',json={'enabled':True,'plan':[{'time':'07:30','activity':'晨跑'},{'time':'23:00','activity':'睡觉'}]})
+    backup=client.get(prefix+'/export').json()
+    assert backup['routine']['enabled'] is True
+    assert [x['activity'] for x in backup['routine']['plan']]==['晨跑','睡觉']
+    # 破坏本地模板后从备份恢复
+    client.put(prefix+'/routine',json={'enabled':False,'plan':[]})
+    assert client.get(prefix+'/routine').json()['enabled'] is False
+    result=client.post(prefix+'/import',json={'routine':backup['routine']})
+    assert result.status_code==200 and 'routine' in result.json()['imported']
+    restored=client.get(prefix+'/routine').json()
+    assert restored['enabled'] is True and len(restored['plan'])==2
+    # 非法模板在写入前被拒绝
+    assert client.post(prefix+'/import',json={'routine':{'enabled':True,'plan':[{'time':'99:99','activity':'x'}]}}).status_code==400
+    assert client.get(prefix+'/routine').json()['plan'][0]['time']=='07:30'
