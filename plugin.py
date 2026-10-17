@@ -33,6 +33,8 @@
   - PUT      /agents/{id}/binding 绑定开关（同时安装/移除自带技能）
   - /timeline /milestones /score /style /memory-sync  日记时间线、大事记、可解释计分、风格、增量同步
   - /organizer/*                  聊天整理与文件回填（预览确认制）
+  - GET/POST /diary 等             陪伴日记列表/预览/写入/删除与自动日记设置
+  - POST     /plan/preview|apply   规划模式：模型起草作息+整理节奏+关怀建议（预览确认制）
 
 智能体工具（@app.tool，tool_type=internal）：
   - companion_get_state          读取当前状态
@@ -1447,7 +1449,7 @@ def complete_setup(payload: SetupProfile):
 
 
 # Feature modules share the data lock and the host's existing lifecycle.
-for _feature_name in ("companion_features", "care", "life", "checkup", "diary"):
+for _feature_name in ("companion_features", "care", "life", "checkup", "diary", "plan"):
     _spec = _importlib_util.spec_from_file_location("companion_"+_feature_name, _PLUGIN_DIR / (_feature_name+".py"))
     _module = _importlib_util.module_from_spec(_spec)
     _spec.loader.exec_module(_module)

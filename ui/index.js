@@ -27,6 +27,7 @@
 
   var Button = antd.Button;
   var Dropdown = antd.Dropdown;
+  var Checkbox = antd.Checkbox;
   var Empty = antd.Empty;
   var Input = antd.Input;
   var InputNumber = antd.InputNumber;
@@ -85,6 +86,12 @@
       routineSaved: "已保存为作息模板，明天起自动生成今日日程", routineDisabled: "已停用自动作息",
       routineEnabled: "已启用自动作息", routineApplied: "已按模板生成今日日程",
       routineHint: "作息模板让每天自动有日程，生活引擎才能跨日持续演化；当天的手动修改不会被覆盖。",
+      tabDiary: "陪伴日记", diaryHint: "日记只从当天真实记录起草，预览确认后才写入；无记录不生成。",
+      diaryGenerate: "生成今日日记预览", diaryPreviewed: "预览已生成", diaryApply: "确认写入", diaryWritten: "日记已写入",
+      diaryAuto: "自动日记", diaryAutoOn: "自动日记已开启", diaryAutoOff: "自动日记已关闭", diaryTime: "生成时间",
+      diaryEmpty: "还没有日记", diaryFromModel: "模型起草", diaryFromRule: "规则草稿", view: "查看",
+      planTitle: "规划模式", planGenerate: "生成规划预览", planPreviewed: "规划预览已生成", planApply: "应用作息与整理节奏",
+      planApplied: "规划已应用", planWeekend: "周末版", planOrganizer: "整理节奏：", planCare: "关怀建议时间：",
       summaryMood: "此刻心情", summaryEnergy: "今日精力", summaryWarmth: "关系温度",
       openSection: "打开", summaryEmpty: "慢慢来，从一条记录开始。", viewAll: "查看全部",
 
@@ -172,6 +179,12 @@
       routineDisabled: "Daily routine disabled", routineEnabled: "Daily routine enabled",
       routineApplied: "Today's plans regenerated from the routine",
       routineHint: "A routine gives every day a schedule so the life engine keeps evolving across days; manual edits made today are never overwritten.",
+      tabDiary: "Companion diary", diaryHint: "Diaries are drafted only from that day's real records and written after you confirm; nothing is fabricated.",
+      diaryGenerate: "Draft today's diary", diaryPreviewed: "Preview ready", diaryApply: "Confirm and write", diaryWritten: "Diary written",
+      diaryAuto: "Auto diary", diaryAutoOn: "Auto diary on", diaryAutoOff: "Auto diary off", diaryTime: "Generation time",
+      diaryEmpty: "No diary yet", diaryFromModel: "Model draft", diaryFromRule: "Rule draft", view: "View",
+      planTitle: "Planning mode", planGenerate: "Draft plan", planPreviewed: "Plan preview ready", planApply: "Apply routine & cadence",
+      planApplied: "Plan applied", planWeekend: "Weekend", planOrganizer: "Organizer cadence: ", planCare: "Suggested care time: ",
       summaryMood: "Current mood", summaryEnergy: "Energy today", summaryWarmth: "Relationship warmth",
       openSection: "Open", summaryEmpty: "Start small. One record is enough.", viewAll: "View all",
 
@@ -382,6 +395,15 @@
     getRoutine: function () { return apiFetch("/companion-core/routine"); },
     updateRoutine: function (d) { return apiFetch("/companion-core/routine", { method: "PUT", body: d }); },
     applyRoutineToday: function () { return apiFetch("/companion-core/routine/apply-today", { method: "POST", body: {} }); },
+    listDiary: function () { return apiFetch("/companion-core/diary"); },
+    getDiary: function (d) { return apiFetch("/companion-core/diary/" + encodeURIComponent(d)); },
+    deleteDiary: function (d) { return apiFetch("/companion-core/diary/" + encodeURIComponent(d), { method: "DELETE" }); },
+    diaryPreview: function (d) { return apiFetch("/companion-core/diary/preview", { method: "POST", body: { date: d || "" } }); },
+    diaryApply: function (id) { return apiFetch("/companion-core/diary/apply", { method: "POST", body: { preview_id: id } }); },
+    diarySettings: function () { return apiFetch("/companion-core/diary/settings"); },
+    putDiarySettings: function (d) { return apiFetch("/companion-core/diary/settings", { method: "PUT", body: d }); },
+    planPreview: function (d) { return apiFetch("/companion-core/plan/preview", { method: "POST", body: d }); },
+    planApply: function (id) { return apiFetch("/companion-core/plan/apply", { method: "POST", body: { preview_id: id } }); },
     listDreams: function () { return apiFetch("/companion-core/dreams"); },
     getDream: function (d) { return apiFetch("/companion-core/dreams/" + encodeURIComponent(d)); },
     createDream: function (d) { return apiFetch("/companion-core/dreams", { method: "POST", body: d }); },
@@ -701,10 +723,110 @@
 
   // ── Tab: Schedule ────────────────────────────────────────────────────
 
+  function DiaryTab(props) {
+    var t = props.t, C = props.C;
+    var ls = useAsync(api.listDiary, []);
+    var st = useAsync(api.diarySettings, []);
+    var _v = useState(null), viewing = _v[0], setViewing = _v[1];
+    var _p = useState(null), preview = _p[0], setPreview = _p[1];
+    var _b = useState(false), busy = _b[0], setBusy = _b[1];
+    function act(promise, okKey, after) {
+      if (busy) return;
+      setBusy(true);
+      promise.then(function (res) { message.success(t(okKey)); if (after) after(res); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setBusy(false); ls.retry(); st.retry(); });
+    }
+    if (ls.loading) return h(LoadingBlock, { t: t, C: C });
+    if (ls.error) return h(ErrorBlock, { t: t, C: C, error: ls.error, onRetry: ls.retry });
+    var settings = st.data || {};
+    var list = ls.data || [];
+    return h("div", {},
+      h(SectionIntro, { C: C }, t("diaryHint")),
+      h(Toolbar, {
+        left: h(Space, { wrap: true },
+          h(Button, { size: "small", type: "primary", disabled: busy, onClick: function () {
+              act(api.diaryPreview(localToday()), "diaryPreviewed", function (res) { setPreview(res); });
+            } }, t("diaryGenerate")),
+          h(Space, { size: 4 },
+            h("span", { style: { color: C.sub, fontSize: 12 } }, t("diaryAuto")),
+            h(Switch, { size: "small", checked: !!settings.auto, disabled: busy, onChange: function (v) {
+                act(api.putDiarySettings({ auto: v, time: settings.time || "22:30" }), v ? "diaryAutoOn" : "diaryAutoOff");
+              } }),
+            h(Input, { type: "time", "aria-label": t("diaryTime"), value: settings.time || "22:30", style: { width: 110 },
+              onChange: function (e) { if (/^([01]\d|2[0-3]):[0-5]\d$/.test(e.target.value)) act(api.putDiarySettings({ auto: !!settings.auto, time: e.target.value }), "saved"); } }))),
+        right: h(Button, { size: "small", onClick: ls.retry }, t("refresh")),
+      }),
+      preview ? h("div", { style: Object.assign({}, panelStyle(C), { padding: 12, marginBottom: 12 }) },
+        h("strong", null, preview.date + " · " + (preview.source === "model" ? t("diaryFromModel") : t("diaryFromRule"))),
+        preview.notice ? h("p", { style: { color: C.sub, fontSize: 12 } }, preview.notice) : null,
+        h("pre", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: "inherit" } }, preview.text),
+        h(Space, {},
+          h(Button, { size: "small", type: "primary", disabled: busy, onClick: function () {
+              act(api.diaryApply(preview.preview_id), "diaryWritten", function () { setPreview(null); });
+            } }, t("diaryApply")),
+          h(Button, { size: "small", onClick: function () { setPreview(null); } }, t("cancel")))) : null,
+      viewing ? h("div", { style: Object.assign({}, panelStyle(C), { padding: 12, marginBottom: 12 }) },
+        h("strong", null, viewing.date),
+        h("pre", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: "inherit" } }, viewing.content),
+        h(Space, {},
+          h(Popconfirm, { title: t("confirmDeleteSchedule"), onConfirm: function () {
+              act(api.deleteDiary(viewing.date), "deleted", function () { setViewing(null); });
+            } }, h(Button, { size: "small", danger: true, disabled: busy }, t("delete"))),
+          h(Button, { size: "small", onClick: function () { setViewing(null); } }, t("cancel")))) : null,
+      h("div", { style: panelStyle(C) },
+        list.length === 0 ? h(Empty, { description: t("diaryEmpty") })
+          : list.map(function (item) {
+              return h("div", { key: item.date, style: { display: "flex", gap: 10, alignItems: "center", padding: "8px 0", borderBottom: C.fieldBorder } },
+                h("span", { style: { fontFamily: "monospace", color: C.accent } }, item.date),
+                h("span", { style: { flex: 1, color: C.sub, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, item.preview),
+                h(Button, { size: "small", type: "link", onClick: function () {
+                    api.getDiary(item.date).then(setViewing).catch(function (e) { message.error(e.message); });
+                  } }, t("view")));
+            })));
+  }
+
+  function PlanModal(props) {
+    var t = props.t, C = props.C, open = props.open, onClose = props.onClose, onApplied = props.onApplied;
+    var _p = useState(null), preview = _p[0], setPreview = _p[1];
+    var _w = useState(false), weekend = _w[0], setWeekend = _w[1];
+    var _b = useState(false), busy = _b[0], setBusy = _b[1];
+    function run(fn, okKey) {
+      if (busy) return;
+      setBusy(true);
+      fn().then(function (res) { message.success(t(okKey)); if (res && res.preview_id) setPreview(res); if (okKey === "planApplied") { setPreview(null); if (onApplied) onApplied(); } })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setBusy(false); });
+    }
+    return h(Modal, { open: open, title: t("planTitle"), footer: null, onCancel: onClose, width: 560 },
+      h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+        h(Space, { wrap: true },
+          h(Checkbox, { checked: weekend, onChange: function (e) { setWeekend(e.target.checked); } }, t("planWeekend")),
+          h(Button, { size: "small", type: "primary", loading: busy, onClick: function () {
+              run(function () { return api.planPreview({ weekend: weekend }); }, "planPreviewed");
+            } }, t("planGenerate"))),
+        preview ? h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+          h("strong", null, preview.source === "model" ? t("diaryFromModel") : t("diaryFromRule")),
+          preview.notice ? h("p", { style: { color: C.sub, fontSize: 12 } }, preview.notice) : null,
+          h("div", { style: { maxHeight: 220, overflow: "auto" } },
+            (preview.plan.routine || []).map(function (x, i) {
+              return h("p", { key: i, style: { margin: "2px 0", fontFamily: "monospace", fontSize: 12 } }, x.time + "  " + x.activity);
+            })),
+          h("p", { style: { color: C.sub, fontSize: 12 } },
+            t("planOrganizer") + (preview.plan.organizer.auto_enabled ? "ON " : "OFF ") + preview.plan.organizer.interval_minutes + "min · " +
+            t("planCare") + preview.plan.care.time),
+          h(Space, {},
+            h(Button, { size: "small", type: "primary", loading: busy, onClick: function () {
+                run(function () { return api.planApply(preview.preview_id); }, "planApplied");
+              } }, t("planApply")),
+            h(Button, { size: "small", onClick: onClose }, t("cancel")))) : null));
+  }
+
   function RoutineBar(props) {
     var t = props.t, C = props.C, plan = props.plan, onSaved = props.onSaved;
     var r = useAsync(api.getRoutine, []);
     var _b = useState(false), busy = _b[0], setBusy = _b[1];
+    var _pl = useState(false), planOpen = _pl[0], setPlanOpen = _pl[1];
     if (r.loading) return null;
     var routine = r.data || {};
     var enabled = !!routine.enabled;
@@ -737,6 +859,8 @@
           enabled ? h(Popconfirm, { title: t("routineApplyConfirm"), onConfirm: function () {
               act(api.applyRoutineToday(), "routineApplied");
             } }, h(Button, { size: "small", type: "link", disabled: busy }, t("routineApply"))) : null),
+        h(Space, { style: { marginLeft: "auto" } }, h(Button, { size: "small", onClick: function () { setPlanOpen(true); } }, t("planTitle"))),
+        h(PlanModal, { t: t, C: C, open: planOpen, onClose: function () { setPlanOpen(false); }, onApplied: onSaved }),
         h("span", { style: { flexBasis: "100%", color: C.sub, fontSize: 12 } }, t("routineHint"))));
   }
 
@@ -1639,7 +1763,7 @@
       setCustOpen(false);
     }
     var NAV_KEYS = [["overview","tabOverview"],["state","tabState"],["schedule","tabSchedule"],["dreams","tabDreams"],
-      ["notes","tabNotes"],["relationship","tabRelationship"],["dates","tabDates"],["organizer","tabOrganizer"],
+      ["notes","tabNotes"],["diary","tabDiary"],["relationship","tabRelationship"],["dates","tabDates"],["organizer","tabOrganizer"],
       ["agents","tabAgents"],["data","tabData"],["timeline","tabTimeline"],["milestones","bfMilestones"],
       ["care","tabCare"],["checkup","tabCheckup"],["about","tabAbout"]];
     function navLabel(key) {
@@ -1697,6 +1821,7 @@
           { key: "state", label: "🌤 " + t("tabState"), children: h(StateTab, { key:revision, t: t, C: C }) },
           { key: "schedule", label: "📅 " + t("tabSchedule"), children: h(ScheduleTab, { key:revision, t: t, C: C }) },
           { key: "dreams", label: "💭 " + t("tabDreams"), children: h(DreamsTab, { key:revision, t: t, C: C }) },
+          { key: "diary", label: "📔 " + t("tabDiary"), children: h(DiaryTab, { t: t, C: C }) },
           { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { key:revision, t: t, C: C }) },
           { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { key:revision, t: t, C: C }) },
           { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C, onCare:function(item){setCareSuggestion(item);setActiveTab("care");} }) },

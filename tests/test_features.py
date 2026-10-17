@@ -562,3 +562,39 @@ def test_diary_preview_apply_conflict_and_no_fabrication(loaded,monkeypatch):
     assert client.put(prefix+'/diary/settings',json={'auto':True,'time':'22:30'}).status_code==400
     assert client.put(prefix+'/diary/settings',json={'auto':False,'time':'22:30'}).json()['auto'] is False
     assert client.get(prefix+'/diary/status').json() == {} or True
+
+
+def test_plan_rule_fallback_model_validation_and_apply(loaded,monkeypatch):
+    import json as _json
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    # 无模型 → 规则草稿，且可应用作息
+    r=client.post(prefix+'/plan/preview',json={'weekend':False})
+    assert r.status_code==200, r.text
+    body=r.json()
+    assert body['source']=='rule' and body['model_available'] is False
+    applied=client.post(prefix+'/plan/apply',json={'preview_id':body['preview_id']}).json()
+    assert applied['written']==['routine'] and applied['care_suggestion']
+    routine=module._read_yaml(root/'routine.yaml')
+    assert routine['enabled'] is True and len(routine['plan'])>=6
+    # 有模型 → 校验通过后写入 routine + organizer，关怀只给建议
+    root.joinpath('organizer-settings.json').write_text(_json.dumps(
+        {'base_url':'https://example.org/v1','model':'mini','modules':{
+            k:{} for k in ('state','schedule','dreams','notes','relationship','dates')}}),encoding='utf-8')
+    good=({'routine':[{'time':'08:00','activity':'起','mood':'平稳'},{'time':'22:00','activity':'睡','mood':'平稳'}],
+           'organizer':{'auto_enabled':True,'interval_minutes':45},
+           'care':{'time':'09:00','quiet_start':'23:00','quiet_end':'08:00'}},{})
+    monkeypatch.setattr(module.organizer,'complete',lambda *a: good)
+    r2=client.post(prefix+'/plan/preview',json={})
+    assert r2.status_code==200 and r2.json()['source']=='model'
+    a2=client.post(prefix+'/plan/apply',json={'preview_id':r2.json()['preview_id']}).json()
+    assert a2['written']==['routine','organizer'] and a2['care_suggestion']['time']=='09:00'
+    cfg=module.organizer.read_json(root/'organizer-settings.json',{})
+    assert cfg['auto_enabled'] is True and cfg['interval_minutes']==45
+    # 空 routine / 关怀时间落静默段 → 502 拒绝
+    monkeypatch.setattr(module.organizer,'complete',lambda *a: ({'routine':[]},{}))
+    assert client.post(prefix+'/plan/preview',json={}).status_code==502
+    bad=({'routine':[{'time':'08:00','activity':'x','mood':'平稳'}],'organizer':{'interval_minutes':30},
+          'care':{'time':'02:00','quiet_start':'23:00','quiet_end':'08:00'}},{})
+    monkeypatch.setattr(module.organizer,'complete',lambda *a: bad)
+    assert client.post(prefix+'/plan/preview',json={}).status_code==502

@@ -28,7 +28,7 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   const tree = route.component();
   // Default shows every tab; collapsing is an explicit user choice (localStorage).
   const tabsNode = tree.children.find(c => c && c.props && Array.isArray(c.props.items));
-  assert.equal(tabsNode.props.items.length, 15);
+  assert.equal(tabsNode.props.items.length, 16);
   effects[0]();
   await new Promise(resolve => setImmediate(resolve));
   const base = mode === 'base-path' ? '/paw/api' : '/api';
@@ -40,7 +40,7 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   assert.equal(requests.at(-1), base + mount + '/companion-core/state', mode);
   assert.equal(requests.length, 4, 'one discovery probe and no mutation retries');
 }
-console.log('Frontend: 7 host modes, routes, all tabs visible by default; user toggle collapses secondary and health API passed');
+console.log('Frontend: 7 host modes, routes, 16 tabs visible by default; user toggle collapses secondary and health API passed');
 
 // Evaluate date helpers in isolation without adding production globals.
 const helperContext = {window:{QwenPaw:{host:{React:{createElement(){}, useState(){}, useEffect(){}},antd:{Input:{}}}}},console};
