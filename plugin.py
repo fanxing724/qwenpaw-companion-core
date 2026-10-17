@@ -23,6 +23,16 @@
   - GET      /export             导出所有数据（备份）
   - POST     /import             导入数据（恢复）
   - GET      /health             健康检查
+  - GET/PUT  /life               生活引擎开关、自动字段与演化预览
+  - GET/PUT  /routine            作息模板读写（跨日自动物化今日日程）
+  - POST     /routine/apply-today 显式用模板重建今日日程
+  - GET      /checkup            自检清单（存储/权限/绑定/技能/关怀任务等）
+  - POST     /checkup/fix        一键修复（含"修复全部"可用的非绑定类项）
+  - GET/PUT  /care 等             关怀配置、预览、停启、重试与预约跟进
+  - GET      /agents              各智能体绑定/技能状态
+  - PUT      /agents/{id}/binding 绑定开关（同时安装/移除自带技能）
+  - /timeline /milestones /score /style /memory-sync  日记时间线、大事记、可解释计分、风格、增量同步
+  - /organizer/*                  聊天整理与文件回填（预览确认制）
 
 智能体工具（@app.tool，tool_type=internal）：
   - companion_get_state          读取当前状态

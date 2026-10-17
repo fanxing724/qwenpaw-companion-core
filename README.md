@@ -76,7 +76,9 @@ qwenpaw plugin install --force /path/to/companion-core
 
 ### 技能安装
 
-将 `SKILL.md` 注册为 Agent 的技能：
+**推荐：绑定即安装。** 在「智能体绑定」页（或 `PUT /agents/{id}/binding`）绑定智能体时，扩展会把自带 `SKILL.md` 写入该智能体工作区的 `skills/companion_core/` 并启用；已存在且内容不一致时不覆盖，可在检查页一键更新。解绑仅移除与扩展完全一致的副本。
+
+手动方式（可选）：
 1. 将 `SKILL.md` 放到 Agent 工作区的 `skills/companion_core/` 目录
 2. 在 `skill.json` 中启用该技能
 3. 按需配置 `jobs.json` 中的定时关怀任务
@@ -102,6 +104,13 @@ qwenpaw plugin install --force /path/to/companion-core
 | `/api/companion-core/dates/{name}` | DELETE | 删除重要日期 |
 | `/api/companion-core/export` | GET | 导出所有数据（备份） |
 | `/api/companion-core/import` | POST | 导入数据（恢复） |
+| `/api/companion-core/life` | GET/PUT | 生活引擎开关、自动管理字段与演化预览（纯规则、零模型） |
+| `/api/companion-core/checkup` | GET | 自检清单：存储持久性、数据权限、绑定/技能、关怀任务完整性等 |
+| `/api/companion-core/checkup/fix` | POST | 一键修复（绑定类修复不参与批量） |
+| `/api/companion-core/care` | GET/PUT | 关怀配置读写（PUT 需预览确认） |
+| `/api/companion-core/care/stop` | POST | 停用关怀并清理其定时任务 |
+| `/api/companion-core/agents` | GET | 各智能体绑定与技能状态 |
+| `/api/companion-core/agents/{id}/binding` | PUT | 绑定开关（同时安装/移除自带技能） |
 | `/api/companion-core/health` | GET | 健康检查 |
 
 PawApp SDK 模式遵循官方 Creator 的路由约定，使用 `/api/companion-core/*`。旧版标准 router 加载器使用 `/api/plugins/companion-core/*`；仪表盘通过只读健康检查自动兼容这两种模式。外部脚本请按宿主实际加载模式选择前缀。

@@ -34,6 +34,10 @@ metadata:
 | `/api/companion-core/dates/{name}` | DELETE | 删除重要日期 |
 | `/api/companion-core/export` | GET | 导出所有数据（备份） |
 | `/api/companion-core/import` | POST | 导入数据（恢复） |
+| `/api/companion-core/life` | GET/PUT | 生活引擎状态与预览（状态/日程可能被自动维护，读取引用即可） |
+| `/api/companion-core/routine` | GET/PUT | 作息模板（跨日自动生成今日日程的来源） |
+| `/api/companion-core/checkup` | GET | 自检清单；配置类问题优先引导用户在此一键修复 |
+| `/api/companion-core/agents` | GET | 绑定与技能状态 |
 | `/api/companion-core/health` | GET | 健康检查 |
 
 用 `curl` 或 `web_fetch` 调用这些 API。PUT 接口为**增量合并**：只需提交要修改的字段。
