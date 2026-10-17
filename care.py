@@ -476,6 +476,7 @@ class Care:
         class Tick(HookBase):
             phase=Phase.PRE_DISPATCH;name='companion_care_tick';priority=1
             async def run(self,ctx):
+                owner.c['_use_profile'](ctx.agent_id)
                 cfg=owner.settings(ctx.agent_id)
                 token=getattr(ctx.request,'companion_care_token',None)
                 context=getattr(ctx.request,'request_context',None) or {}

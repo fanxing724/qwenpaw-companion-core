@@ -96,6 +96,8 @@
       weeklyGenerate: "生成本周回顾", weeklyWritten: "周回顾已写入",
       usageTitle: "模型用量", usageHint: "整理、日记、周回顾与规划的 token 消耗按来源累计，仅统计宿主返回的用量。",
       usageEmpty: "还没有模型调用记录", usageCalls: "{count} 次", usageTokens: "{count} tokens", usageRecent: "最近明细",
+      profileLabel: "数据档案", profileShared: "共用（shared）", profileOwn: "独立档案", profileCustom: "自定义组名",
+      profileSaved: "档案已保存", profileHint: "不同档案的陪伴数据完全隔离；切换不迁移已有数据，可用导出/导入搬迁。",
       summaryMood: "此刻心情", summaryEnergy: "今日精力", summaryWarmth: "关系温度",
       openSection: "打开", summaryEmpty: "慢慢来，从一条记录开始。", viewAll: "查看全部",
 
@@ -193,6 +195,8 @@
       weeklyGenerate: "Draft this week's review", weeklyWritten: "Weekly review written",
       usageTitle: "Model usage", usageHint: "Token usage of organizer, diary, weekly and planning calls, aggregated per source; only counts usage reported by the provider.",
       usageEmpty: "No model calls recorded yet", usageCalls: "{count} calls", usageTokens: "{count} tokens", usageRecent: "Recent",
+      profileLabel: "Data profile", profileShared: "Shared", profileOwn: "Own profile", profileCustom: "Custom group",
+      profileSaved: "Profile saved", profileHint: "Profiles fully isolate companion data; switching never migrates existing records — use export/import to move them.",
       summaryMood: "Current mood", summaryEnergy: "Energy today", summaryWarmth: "Relationship warmth",
       openSection: "Open", summaryEmpty: "Start small. One record is enough.", viewAll: "View all",
 
@@ -374,6 +378,11 @@
 
   function apiFetch(path, opts) {
     opts = opts || {};
+    var scopedAgent = "";
+    try { scopedAgent = (host.getSelectedAgentId && host.getSelectedAgentId()) || ""; } catch (e) { scopedAgent = ""; }
+    if (scopedAgent && path.indexOf("agent=") < 0 && path.indexOf("agent_id=") < 0) {
+      path += (path.indexOf("?") >= 0 ? "&" : "?") + "agent=" + encodeURIComponent(scopedAgent);
+    }
     return resolveApiMount().then(function (mount) {
       var url = apiUrl(mount + path);
       var token = host.getApiToken ? host.getApiToken() : "";
@@ -418,6 +427,8 @@
     weeklyPreview: function (k) { return apiFetch("/companion-core/weekly/preview", { method: "POST", body: { week: k || "" } }); },
     weeklyApply: function (id) { return apiFetch("/companion-core/weekly/apply", { method: "POST", body: { preview_id: id } }); },
     usage: function () { return apiFetch("/companion-core/usage"); },
+    profiles: function () { return apiFetch("/companion-core/profiles"); },
+    putProfiles: function (m) { return apiFetch("/companion-core/profiles", { method: "PUT", body: { map: m } }); },
     listDreams: function () { return apiFetch("/companion-core/dreams"); },
     getDream: function (d) { return apiFetch("/companion-core/dreams/" + encodeURIComponent(d)); },
     createDream: function (d) { return apiFetch("/companion-core/dreams", { method: "POST", body: d }); },
@@ -1650,6 +1661,8 @@
   function AgentsTab(props) {
     var t = props.t, C = props.C;
     var s = useAsync(api.agents, []);
+    var ps = useAsync(api.profiles, []);
+    var cs = useState({}), customs = cs[0], setCustoms = cs[1];
     var busyState = useState(false), busy = busyState[0], setBusy = busyState[1];
     var noticeState = useState(""), notice = noticeState[0], setNotice = noticeState[1];
     function bind(id, enabled) {
@@ -1674,6 +1687,30 @@
         return h("article",{key:agent.id,style:{border:C.border,borderRadius:12,padding:16,marginBottom:14}},
           h("h3",{style:{marginTop:0}},agent.name," ",h(Tag,{color:agent.binding === "bound" ? "green" : "default"},t(labels[agent.binding] || "agentUnknown"))),
           h("p",{style:{color:C.sub,overflowWrap:"anywhere"}},agent.id),
+          h("p",{style:{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",margin:"8px 0"}},
+            h("span",{style:{color:C.sub,fontSize:12}},t("profileLabel")),
+            h("select",{value:((ps.data&&ps.data.map&&ps.data.map[agent.id])||"shared"),style:{padding:"4px 8px",borderRadius:6,border:"1px solid #aaa",background:C.cardBg,color:C.text},
+              onChange:function(e){
+                var map=Object.assign({},(ps.data&&ps.data.map)||{});
+                map[agent.id]=e.target.value;
+                api.putProfiles(map).then(function(){message.success(t("profileSaved"));ps.retry();})
+                  .catch(function(er){message.error(er.message);});
+              }},
+              h("option",{value:"shared"},t("profileShared")),
+              h("option",{value:agent.id},t("profileOwn")),
+              (function(){var cur=(ps.data&&ps.data.map&&ps.data.map[agent.id])||"shared";
+                return (cur!=="shared"&&cur!==agent.id)?h("option",{value:cur},cur):null;})()),
+            h("input",{value:customs[agent.id]||"",placeholder:t("profileCustom"),style:{padding:"4px 8px",borderRadius:6,border:"1px solid #aaa",background:C.cardBg,color:C.text,width:140},
+              onChange:function(e){var next=Object.assign({},customs);next[agent.id]=e.target.value;setCustoms(next);}}),
+            h(Button,{size:"small",onClick:function(){
+              var v=(customs[agent.id]||"").trim();
+              if(!v){message.warning(t("profileCustom"));return;}
+              var map=Object.assign({},(ps.data&&ps.data.map)||{});
+              map[agent.id]=v;
+              api.putProfiles(map).then(function(){message.success(t("profileSaved"));ps.retry();})
+                .catch(function(er){message.error(er.message);});
+            }},t("save"))),
+          h("p",{style:{color:C.sub,fontSize:12}},t("profileHint")),
           agent.error ? h("p",{role:"alert"},agent.error) : h("p",null,t("agentTools") + ": " + agent.enabled_tools.length + "/" + agent.total_tools),
           agent.agent_enabled === false ? h("p",null,t("agentDisabled")) : null,
           h("p",{style:{overflowWrap:"anywhere"}},agent.last_call

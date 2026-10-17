@@ -164,6 +164,7 @@ def install(router, owner, life):
             priority = 2
 
             async def run(self, ctx):
+                c["_use_profile"](getattr(ctx, "agent_id", None))
                 cfg = read_settings()
                 context = getattr(ctx.request, "request_context", None) or {}
                 if context.get("source") == "cron" and context.get("cron_job_id") == job_id(cfg.get("agent_id", "")):

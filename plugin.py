@@ -37,6 +37,7 @@
   - POST     /plan/preview|apply   规划模式：模型起草作息+整理节奏+关怀建议（预览确认制）
   - GET/POST /weekly 等            周回顾列表/预览/写入/删除（当周真实记录起草）
   - GET      /usage               模型用量按来源汇总与最近明细
+  - GET/PUT  /profiles            智能体→数据档案映射（shared 或独立档案）
 
 智能体工具（@app.tool，tool_type=internal）：
   - companion_get_state          读取当前状态
@@ -49,6 +50,7 @@
 """
 
 import asyncio
+import contextvars
 import json
 import logging
 import os
@@ -68,7 +70,7 @@ except ImportError as exc:
         "companion-core 需要 pyyaml>=6.0（正常安装的 QwenPaw 宿主通常自带）。"
         "请在宿主使用的 Python 环境中检查并修复 PyYAML 依赖后重试。"
     ) from exc
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import Depends, APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 try:
@@ -95,10 +97,78 @@ _call_history = {}  # Bounded latest call per agent; no conversation content sto
 
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
-_DATA_DIR = Path(os.environ.get(
+_BASE_DATA_DIR = Path(os.environ.get(
     "QWENPAW_COMPANION_DATA",
     Path.home() / ".qwenpaw" / "data" / "companion-core"
 ))
+_PROFILE_CTX = contextvars.ContextVar("companion_profile", default=None)
+_PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
+
+
+class _ProfilePath:
+    """Lazily resolves to the active profile's data directory.
+
+    Keeps every historical ``_DATA_DIR / "x"`` call site working while the
+    concrete directory is chosen per request / tool call / hook through
+    ``_PROFILE_CTX``. ``shared`` (default) maps to the base directory, so
+    existing single-profile installs are untouched.
+    """
+
+    def __init__(self, *parts):
+        self._parts = parts
+
+    def _resolve(self):
+        base = _BASE_DATA_DIR
+        pid = _PROFILE_CTX.get()
+        if pid and pid != "shared":
+            base = base / "profiles" / pid
+        return base.joinpath(*self._parts) if self._parts else base
+
+    def __truediv__(self, other):
+        return _ProfilePath(*self._parts, str(other))
+
+    def __str__(self):
+        return str(self._resolve())
+
+    def __fspath__(self):
+        return str(self._resolve())
+
+    def __repr__(self):
+        return f"_ProfilePath({self._resolve()})"
+
+    def __eq__(self, other):
+        return self._resolve() == other
+
+    def __hash__(self):
+        return hash(self._resolve())
+
+    def __getattr__(self, name):
+        return getattr(self._resolve(), name)
+
+
+_DATA_DIR = _ProfilePath()
+
+
+def _profiles_path():
+    return _BASE_DATA_DIR / "profiles.json"
+
+
+def _profile_map():
+    data = _read_json(_profiles_path())
+    if isinstance(data, dict) and isinstance(data.get("map"), dict):
+        return {str(k): str(v) for k, v in data.get("map", {}).items()}
+    return {}
+
+
+def _use_profile(agent_id):
+    """Bind this context to the agent's profile; seed it on first use."""
+    pid = _profile_map().get(agent_id or "", "shared")
+    if pid != "shared" and not _PROFILE_RE.match(pid):
+        pid = "shared"
+    token = _PROFILE_CTX.set(None if pid == "shared" else pid)
+    if pid != "shared":
+        _seed_data()
+    return token
 
 _lock = threading.Lock()
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -353,7 +423,16 @@ def _seed_data() -> None:
 
 # ── HTTP router ──────────────────────────────────────────────────────
 
-router = APIRouter()
+async def _profile_from_request(request: Request):
+    agent = request.query_params.get("agent") or request.query_params.get("agent_id") or None
+    token = _use_profile(agent) if agent else _PROFILE_CTX.set(None)
+    try:
+        yield
+    finally:
+        _PROFILE_CTX.reset(token)
+
+
+router = APIRouter(dependencies=[Depends(_profile_from_request)])
 
 
 # ==================== 状态 ====================
@@ -865,6 +944,37 @@ def apply_relationship_decay():
 
 # ==================== 健康检查 ====================
 
+@router.get("/profiles")
+def get_profiles():
+    """智能体 → 数据档案映射；缺省 shared（全部智能体共用同一份数据）。"""
+    return {"map": _profile_map()}
+
+
+@router.put("/profiles")
+def put_profiles(payload: dict):
+    mapping = payload.get("map") if isinstance(payload, dict) else None
+    if not isinstance(mapping, dict):
+        raise HTTPException(400, "map 必须是对象")
+    clean = {}
+    for agent_id, pid in mapping.items():
+        if not isinstance(agent_id, str) or not agent_id.strip():
+            raise HTTPException(400, "智能体 ID 无效")
+        pid = str(pid)
+        if pid != "shared" and not _PROFILE_RE.match(pid):
+            raise HTTPException(400, f"档案名无效：{pid}（小写字母或数字开头，≤40 字符）")
+        clean[agent_id.strip()] = pid
+    with _lock:
+        _BASE_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        _write_json(_profiles_path(), {"map": clean})
+    for pid in sorted({v for v in clean.values() if v != "shared"}):
+        token = _PROFILE_CTX.set(pid)
+        try:
+            _seed_data()
+        finally:
+            _PROFILE_CTX.reset(token)
+    return {"map": clean}
+
+
 @router.get("/health")
 def health():
     """健康检查。"""
@@ -1193,11 +1303,14 @@ def _agent_tool(name, **kwargs):
     def decorate(function):
         @wraps(function)
         async def tracked(*args, **call_kwargs):
+            token = _use_profile(_current_agent_id())
             try:
                 result = await function(*args, **call_kwargs)
             except Exception:
                 _record_tool_call(name, "error")
                 raise
+            finally:
+                _PROFILE_CTX.reset(token)
             _record_tool_call(name, "success")
             return result
         return app.tool(name, **kwargs)(tracked) if app is not None else tracked

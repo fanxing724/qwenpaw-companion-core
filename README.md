@@ -36,6 +36,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
+- v2.13.0：多智能体数据隔离——按智能体解析数据档案（profiles.json 映射，独立档案存于 profiles/<id>/），HTTP/工具/钩子三条路径统一解析，默认 shared 完全向后兼容；绑定页可切换共用/独立/自定义组。
 - v2.12.0：互动计分候选（工具互动/关怀投递进入可解释计分，确认制）、周回顾（当周真实记录起草）、模型用量统计页；互动记录与用量持久化并纳入权限收紧。
 - v2.11.0：陪伴日记（模型起草、预览确认、自动日记可选）与规划模式（一键起草作息+整理节奏+关怀建议）；新增「陪伴日记」页签与日程页「规划模式」入口。
 - v2.10.6：检查页修复补全——存储持久性按平台/本地部署标注、数据权限一键收紧、关怀任务一键重建、「一键修复全部」不碰绑定类操作。
@@ -58,7 +59,7 @@
 
 ### 本地安装
 
-将 `companion-core-2.12.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.13.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
 qwenpaw plugin install /path/to/companion-core-2.12.0.zip
@@ -126,6 +127,7 @@ qwenpaw plugin install --force /path/to/companion-core
 | `/api/companion-core/weekly/preview` | POST | 从当周真实记录起草周回顾（无记录不生成） |
 | `/api/companion-core/weekly/apply` | POST | 预览确认后写入；已有回顾拒绝覆盖 |
 | `/api/companion-core/usage` | GET | 模型用量按来源汇总 + 最近明细 |
+| `/api/companion-core/profiles` | GET/PUT | 智能体→数据档案映射：shared 共用或独立档案（数据完全隔离） |
 
 PawApp SDK 模式遵循官方 Creator 的路由约定，使用 `/api/companion-core/*`。旧版标准 router 加载器使用 `/api/plugins/companion-core/*`；仪表盘通过只读健康检查自动兼容这两种模式。外部脚本请按宿主实际加载模式选择前缀。
 
@@ -228,6 +230,8 @@ companion-core/
 ├── state.yaml           # 当前状态
 ├── schedule.yaml        # 今日日程
 ├── routine.yaml         # 作息模板（启用后跨日自动生成今日日程）
+├── profiles.json        # 智能体→数据档案映射（缺省共用）
+├── profiles/<id>/       # 独立档案目录（结构同上，首次使用自动种子化）
 ├── dreams/              # 梦境碎片（YYYY-MM-DD.md）
 ├── notes.json           # 便签
 ├── relationship.yaml    # 关系记录

@@ -658,3 +658,30 @@ def test_usage_aggregates_per_source(loaded,monkeypatch):
     assert usage['totals']['diary']['calls']==2 and usage['totals']['diary']['total']==50
     assert usage['totals']['plan']['total']==70
     assert len(usage['recent'])==3
+
+
+def test_profiles_isolate_data_per_agent(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    client.put(prefix+'/state',json={'mood':'共享'})
+    assert client.put(prefix+'/profiles',json={'map':{'alice':'alice-space'}}).status_code==200
+    assert client.get(prefix+'/profiles').json()['map']=={'alice':'alice-space'}
+    client.put(prefix+'/state?agent=alice',json={'mood':'独立'})
+    assert client.get(prefix+'/state?agent=alice').json()['mood']=='独立'
+    assert client.get(prefix+'/state').json()['mood']=='共享'
+    assert (root/'profiles'/'alice-space'/'state.yaml').exists()
+    assert not (root/'profiles'/'alice-space'/'state.yaml').is_symlink()
+    # 非法档案名与路径穿越一律拒绝
+    assert client.put(prefix+'/profiles',json={'map':{'alice':'../evil'}}).status_code==400
+    assert client.put(prefix+'/profiles',json={'map':{'alice':'Upper'}}).status_code==400
+    # 工具/钩子路径同样按 profile 解析
+    token=module._use_profile('alice')
+    try:
+        assert module._read_yaml(module._DATA_DIR/'state.yaml')['mood']=='独立'
+    finally:
+        module._PROFILE_CTX.reset(token)
+    token=module._use_profile('bob')
+    try:
+        assert module._read_yaml(module._DATA_DIR/'state.yaml')['mood']=='共享'
+    finally:
+        module._PROFILE_CTX.reset(token)

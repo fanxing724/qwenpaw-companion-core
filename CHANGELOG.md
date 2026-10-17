@@ -10,6 +10,10 @@
 - 用量统计：organizer/diary/weekly/plan 的 token 用量持久化，GET /usage 汇总+明细；数据页新增「模型用量」面板。
 - interactions.json 与 usage.json 纳入启动权限收紧与检查页权限清单。
 
+# v2.13.0
+
+- 多智能体数据隔离：profiles.json 映射智能体到数据档案（shared 或 profiles/<id>/ 独立目录，自动种子化）；HTTP（agent 查询参数，前端自动附带）、Agent 工具（执行上下文）、关怀/日记钩子（ctx.agent_id）三条路径统一解析，无上下文回退 shared；档案名校验拒绝路径穿越；切换不迁移数据（导出/导入搬迁）；绑定页新增档案选择器（共用/独立/自定义组）。
+
 # 未发布
 
 - 描述文件全面刷新：plugin.json 描述与中英 i18n、FEATURES.md（新增生活引擎/作息、检查页修复、导航与反馈三节）、SKILL.md（Agent 指引：自动维护字段只读引用、尊重空白日、配置问题引导检查页）、README 与 SKILL 的 REST API 表补齐 /life、/routine、/checkup、/care、/agents 等端点、plugin.py 头部端点清单同步；ROADMAP 与 DESIGN 文档状态刷新并清除已删除文件的死链。
