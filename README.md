@@ -36,7 +36,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
-- v2.11.0：作息模板（跨日自动生成今日日程，生活引擎无需每天手填即可持续演化）；仪表盘导航精简为 8 个主标签 + 「更多」菜单；使用引导新增“开启生活引擎”一步。
+- v2.10.3：作息模板（跨日自动生成今日日程，生活引擎无需每天手填即可持续演化）；仪表盘导航精简为 8 个主标签 + 「更多」菜单；使用引导新增“开启生活引擎”一步。
 - v2.10.1：生活引擎（状态自动演化，可选）、技能随绑定自动安装、检查界面（自检与一键修复）；修复绑定接口自死锁与跨天演化误覆盖手动字段。
 - v2.9.0：稳定测试版，真机验收完成；修复 Actions artifact 双层 ZIP 无法直装的问题，安装包瘦身至 19 个文件，插件功能与 2.8.2 一致。
 - v2.8.1：新增每日历史归档、日记时间线、持久化首见、可解释计分、宿主模型发现与可选关怀任务。
@@ -53,10 +53,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.11.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.10.3.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.11.0.zip
+qwenpaw plugin install /path/to/companion-core-2.10.3.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
