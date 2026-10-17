@@ -36,6 +36,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
+- v2.10.6：检查页修复补全——存储持久性按平台/本地部署标注、数据权限一键收紧、关怀任务一键重建、「一键修复全部」不碰绑定类操作。
 - v2.10.5：导航修复与自定义——修复宿主 `qwenpaw-tabs` 前缀导致的页签被折叠问题；折叠集合改为用户自选（自定义导航弹窗 + 收起开关，偏好持久化）；头部新增「⭐ 支持作者」与「🐞 反馈」（GitHub Issue / 平台社区）入口。
 - v2.10.4：修复作息模板三处缺陷——故意清空的当天不再被模板回填、模板纳入导出/导入备份、`routine.yaml` 权限收紧为 0600；并修正检查界面提示文案重复。
 - v2.10.3：作息模板（跨日自动生成今日日程，生活引擎无需每天手填即可持续演化）；仪表盘导航精简为 8 个主标签 + 「更多」菜单；使用引导新增“开启生活引擎”一步。
@@ -55,10 +56,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.10.5.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.10.6.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.10.5.zip
+qwenpaw plugin install /path/to/companion-core-2.10.6.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
