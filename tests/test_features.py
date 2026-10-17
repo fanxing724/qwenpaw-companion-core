@@ -431,3 +431,49 @@ def test_incremental_line_review_excludes_old_lines_and_never_stores_plaintext(f
     preview=client.post(endpoint+'/preview',json={'review_id':review['review_id'],'confirmed':True}).json()
     assert client.post(endpoint+'/apply',json={'preview_id':preview['preview_id']}).status_code==200
     assert owner.read_json(module.features.state_path,{})['alice']['changed']==[]
+
+
+def test_routine_materializes_today_without_clobbering_manual_edits(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    client.put(prefix+'/schedule',json={'date':'2026-10-16','plan':[{'time':'09:00','activity':'昨天的安排'}]})
+    # 模板缺失或未启用时完全不介入
+    assert client.get(prefix+'/schedule').json()['date']=='2026-10-16'
+    client.put(prefix+'/routine',json={'enabled':False,'plan':[{'time':'08:00','activity':'起床'}]})
+    assert client.get(prefix+'/schedule').json()['date']=='2026-10-16'
+    # 启用后跨日自动物化今日日程
+    client.put(prefix+'/routine',json={'enabled':True,'plan':[{'time':'08:00','activity':'起床'},{'time':'12:00','activity':'午饭'}]})
+    body=client.get(prefix+'/schedule').json()
+    assert body['date']=='2026-10-17'
+    assert [x['activity'] for x in body['plan']]==['起床','午饭']
+    # 昨日记录照常归档
+    assert module._read_yaml(root/'history'/'2026-10-16.yaml')['schedule']['plan'][0]['activity']=='昨天的安排'
+    # 当天的手动修改不被自动覆盖
+    client.put(prefix+'/schedule',json={'plan':[{'time':'08:00','activity':'起床'},{'time':'09:30','activity':'临时会议'}]})
+    assert [x['activity'] for x in client.get(prefix+'/schedule').json()['plan']][-1]=='临时会议'
+    # 只有显式 apply-today 才重建当天安排
+    assert [x['activity'] for x in client.post(prefix+'/routine/apply-today').json()['plan']][-1]=='午饭'
+    # 模板为空时不生成，也不清空已有日程
+    client.put(prefix+'/routine',json={'enabled':True,'plan':[]})
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-18')
+    stale=client.get(prefix+'/schedule').json()
+    assert stale['date']=='2026-10-17' and stale['plan']
+    # 未启用模板时 apply-today 明确拒绝
+    assert client.post(prefix+'/routine/apply-today').status_code==400
+
+
+def test_corrupt_routine_never_breaks_schedule_reads(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    client.put(prefix+'/schedule',json={'date':'2026-10-16','plan':[{'time':'09:00','activity':'既有安排'}]})
+    # 手工写坏的模板（非法时间、缺字段）不能让日程接口 500
+    module._write_yaml(root/'routine.yaml',{'enabled':True,'plan':[{'time':'25:99'},{'activity':''}]})
+    body=client.get(prefix+'/schedule')
+    assert body.status_code==200 and body.json()['date']=='2026-10-16'
+    assert client.post(prefix+'/routine/apply-today').status_code==400
+    # 生活引擎读取路径同样不受影响
+    life=module.life
+    cfg=life.read();cfg['enabled']=True;life.write(cfg)
+    assert client.get(prefix+'/state').status_code==200

@@ -148,6 +148,13 @@ class ScheduleModel(BaseModel):
     _valid_date = field_validator("date")(_validate_date)
 
 
+class RoutineModel(BaseModel):
+    """作息模板：每日自动生成日程的来源，enabled=False 时完全不介入。"""
+
+    enabled: bool = False
+    plan: list[ScheduleItem] = Field(default_factory=list)
+
+
 class DreamModel(BaseModel):
     date: str = ""
     content: str = Field(default="", max_length=2000)
@@ -368,14 +375,83 @@ def update_state(state: StateModel):
 
 # ==================== 日程 ====================
 
+_ROUTINE_PATH = _DATA_DIR / "routine.yaml"
+
+
+def _ensure_today_schedule() -> bool:
+    """按作息模板物化今日日程；返回是否发生了写入。
+
+    仅在模板已启用且非空、而今日日程缺失或过期时生效；当天已有的
+    日程（含用户手动编辑）绝不被覆盖。写入走 _write_yaml，因此昨日
+    记录会照常进入 history/ 归档。
+    """
+    try:
+        routine = _read_yaml(_ROUTINE_PATH)
+    except Exception:  # noqa: BLE001 - 模板损坏不能让日程接口整体失效
+        return False
+    if not routine or not routine.get("enabled"):
+        return False
+    plan = routine.get("plan") or []
+    if not plan:
+        return False
+    today = _today_str()
+    with _lock:
+        existing = _read_yaml(_DATA_DIR / "schedule.yaml") or {}
+        if existing.get("date") == today and (existing.get("plan") or []):
+            return False
+        try:
+            schedule = ScheduleModel(date=today, plan=plan).model_dump()
+        except (ValidationError, ValueError, TypeError):
+            # 模板内容非法（例如手工改坏）时跳过，不影响读取今日日程。
+            return False
+        _write_yaml(_DATA_DIR / "schedule.yaml", schedule)
+    return True
+
+
 @router.get("/schedule", response_model=ScheduleModel)
 def get_schedule():
-    """获取今日日程。"""
+    """获取今日日程（跨日且启用作息模板时自动物化）。"""
+    _ensure_today_schedule()
     with _lock:
         data = _read_yaml(_DATA_DIR / "schedule.yaml")
     if not data:
         data = ScheduleModel().model_dump()
     return data
+
+
+@router.get("/routine", response_model=RoutineModel)
+def get_routine():
+    """读取作息模板。"""
+    with _lock:
+        data = _read_yaml(_ROUTINE_PATH)
+    if not data:
+        data = RoutineModel().model_dump()
+    return data
+
+
+@router.put("/routine", response_model=RoutineModel)
+def update_routine(routine: RoutineModel):
+    """保存作息模板（增量合并）。"""
+    with _lock:
+        existing = _read_yaml(_ROUTINE_PATH) or {}
+        merged = {**existing, **routine.model_dump(exclude_unset=True)}
+        _write_yaml(_ROUTINE_PATH, merged)
+    return merged
+
+
+@router.post("/routine/apply-today", response_model=ScheduleModel)
+def apply_routine_today():
+    """立即用模板重建今日日程（显式操作，会覆盖当天已有安排）。"""
+    routine = _read_yaml(_ROUTINE_PATH) or {}
+    if not routine.get("enabled") or not routine.get("plan"):
+        raise HTTPException(400, "作息模板未启用或为空，无法生成今日日程")
+    try:
+        schedule = ScheduleModel(date=_today_str(), plan=routine["plan"]).model_dump()
+    except (ValidationError, ValueError, TypeError) as exc:
+        raise HTTPException(400, f"作息模板内容非法，无法生成今日日程：{exc}") from exc
+    with _lock:
+        _write_yaml(_DATA_DIR / "schedule.yaml", schedule)
+    return schedule
 
 
 @router.put("/schedule", response_model=ScheduleModel)
@@ -933,15 +1009,27 @@ def _skill_set_enabled(workspace, enabled):
     _write_json(manifest, data)
 
 
-def _skill_sync(agent_id, enabled):
-    """Install/enable the bundled skill on bind; remove only byte-identical copies on unbind."""
+def _skill_sync(agent_id, enabled, force=False):
+    """Install/enable the bundled skill on bind; remove only byte-identical copies on unbind.
+
+    ``force=True`` 仅用于用户在检查页显式点击「更新技能」：用扩展自带版本
+    覆盖已存在但不一致的副本（例如升级后停留在旧版本的 SKILL.md）。
+    默认的绑定流程永不覆盖用户自定义内容。
+    """
     workspace = _workspace_dir(agent_id)
     if workspace is None:
         return {"status": "skipped", "reason": "无法定位智能体工作区"}
     status = _skill_status(agent_id)
     if enabled:
         if status["status"] == "conflict":
-            return status
+            if not force:
+                return status
+            target_dir = workspace / "skills" / _SKILL_NAME
+            target_dir.mkdir(parents=True, exist_ok=True)
+            _write_text(target_dir / "SKILL.md",
+                        (_PLUGIN_DIR / "SKILL.md").read_text(encoding="utf-8"))
+            _skill_set_enabled(workspace, True)
+            return {"status": "updated"}
         if status["status"] == "missing":
             target_dir = workspace / "skills" / _SKILL_NAME
             target_dir.mkdir(parents=True, exist_ok=True)

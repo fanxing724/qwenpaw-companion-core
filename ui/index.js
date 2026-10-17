@@ -26,6 +26,7 @@
   var useHostTheme = typeof host.useTheme === "function" ? host.useTheme : function () { return { isDark: false }; };
 
   var Button = antd.Button;
+  var Dropdown = antd.Dropdown;
   var Empty = antd.Empty;
   var Input = antd.Input;
   var InputNumber = antd.InputNumber;
@@ -56,7 +57,8 @@
       tabAbout:"关于", aboutCredit:"由番星与 GPT 联合制作", aboutIntro:"为 QwenPaw 提供状态、日程、梦境、便签、关系与重要日期管理。",
       aboutVersion:"当前版本", aboutRepo:"GitHub 源码", aboutReleases:"版本与下载", aboutIssues:"反馈问题", aboutLicense:"MIT 开源协议", aboutThanks:"灵感与功能设计来源于 astrbot_plugin_private_companion，感谢原作者的贡献。",
 
-      setupTitle:"开始你的陪伴记录", setupOpen:"使用引导", setupStep:"第 {step} 步，共 3 步", setupNames:"认识彼此", setupNamesHint:"称呼可以留空。记录从真实的聊天和生活开始。", setupUser:"你的称呼", setupCompanion:"陪伴对象的称呼", setupExisting:"已检测到已有记录。本引导只保存设置，会保留现有数据。", setupClean:"从空白记录开始：不预填心情、作息或关系分数。", setupAgent:"连接智能体", setupAgentHint:"选择一个智能体并启用陪伴工具，也可以稍后在“智能体绑定”中操作。", setupChoose:"暂不绑定", setupBindNext:"绑定并继续", setupModel:"配置 AI 模型", setupModelHint:"可填写一个便宜小模型，供各模块共用。也可跳过，之后在“AI 设置”中配置。保存本身不会调用模型，自动整理保持原来的开关状态。", setupNext:"下一步", setupBack:"上一步", setupLater:"稍后设置", setupFinish:"完成设置", setupMissingModel:"请同时填写 API 地址和模型名称，或选择稍后设置。", orgUseShared:"公共模型", noScore:"尚未记录",
+      setupTitle:"开始你的陪伴记录", setupOpen:"使用引导", quickSetup:"快速配置", navMore:"更多", setupStep:"第 {step} 步，共 4 步",
+      setupLife:"开启生活引擎", setupLifeHint:"让睡眠/饥饿/精力按当前时间与今日日程自动演化。纯规则、不调用模型、不消耗 token，随时可以关闭。", setupLifeNow:"现在开启", setupLifeOn:"已开启", setupModelOptional:"配置 AI 模型（可选）", setupNames:"认识彼此", setupNamesHint:"称呼可以留空。记录从真实的聊天和生活开始。", setupUser:"你的称呼", setupCompanion:"陪伴对象的称呼", setupExisting:"已检测到已有记录。本引导只保存设置，会保留现有数据。", setupClean:"从空白记录开始：不预填心情、作息或关系分数。", setupAgent:"连接智能体", setupAgentHint:"选择一个智能体并启用陪伴工具，也可以稍后在“智能体绑定”中操作。", setupChoose:"暂不绑定", setupBindNext:"绑定并继续", setupModel:"配置 AI 模型", setupModelHint:"可填写一个便宜小模型，供各模块共用。也可跳过，之后在“AI 设置”中配置。保存本身不会调用模型，自动整理保持原来的开关状态。", setupNext:"下一步", setupBack:"上一步", setupLater:"稍后设置", setupFinish:"完成设置", setupMissingModel:"请同时填写 API 地址和模型名称，或选择稍后设置。", orgUseShared:"公共模型", noScore:"尚未记录",
       tabOrganizer:"AI 设置", orgIntro:"使用独立的小模型整理近期聊天，不占用主聊天模型。近期文字会发送至你配置的 API。每个启用模块最多调用一次，六个模块最多六次；实际费用按服务商计费。",
       orgBase:"API 基址（例如 https://example.com/v1）", orgModel:"模型名称", orgKey:"API Key（留空保留已保存密钥）", orgKeySaved:"已保存密钥", orgKeyEmpty:"未设置密钥（支持免密本地接口）", orgKeyClear:"清除已保存密钥", orgInherit:"留空继承公共设置；不同 API 地址不继承公共密钥",
       orgAgent:"整理目标智能体", orgChooseAgent:"选择已绑定的智能体", orgChat:"近期会话", orgChooseChat:"选择一个会话", orgAuto:"聊天结束自动整理", orgAutoHint:"自动整理默认关闭。开启后仅处理目标智能体，在聊天结束后按最小间隔运行，无新内容则跳过；会自动写入数据并保留最近 10 份轮换备份。",
@@ -76,6 +78,12 @@
       scheduleHint: "日程按时间排列，可随时调整。", notesHint: "记下小事，也留住重要的叮嘱。",
       dreamsHint: "记录醒来前的片刻，留住梦里的世界。", datesHint: "让每个重要的日子都被记得。",
       staleSchedule: "这份安排来自 {date}，请留意日期。", records: "{count} 条记录",
+      routineOn: "自动作息：已开启（{count} 条）", routineOff: "自动作息：未开启",
+      routineSave: "保存为作息模板", routineDisable: "停用自动作息", routineEnable: "启用自动作息",
+      routineApply: "用模板生成今天", routineApplyConfirm: "将用作息模板覆盖今天的日程安排，确定吗？",
+      routineSaved: "已保存为作息模板，明天起自动生成今日日程", routineDisabled: "已停用自动作息",
+      routineEnabled: "已启用自动作息", routineApplied: "已按模板生成今日日程",
+      routineHint: "作息模板让每天自动有日程，生活引擎才能跨日持续演化；当天的手动修改不会被覆盖。",
       summaryMood: "此刻心情", summaryEnergy: "今日精力", summaryWarmth: "关系温度",
       openSection: "打开", summaryEmpty: "慢慢来，从一条记录开始。", viewAll: "查看全部",
 
@@ -135,7 +143,8 @@
       tabAbout:"About", aboutCredit:"Jointly created by 番星 and GPT", aboutIntro:"State, schedules, dreams, notes, relationships and important dates for QwenPaw.",
       aboutVersion:"Current version", aboutRepo:"GitHub source", aboutReleases:"Releases & downloads", aboutIssues:"Report an issue", aboutLicense:"MIT License", aboutThanks:"Inspired by astrbot_plugin_private_companion. Thanks to its original author.",
 
-      setupTitle:"Start your companion journal", setupOpen:"Getting started", setupStep:"Step {step} of 3", setupNames:"Get acquainted", setupNamesHint:"Names are optional. Start with real conversations and experiences.", setupUser:"Your name", setupCompanion:"Companion name", setupExisting:"Existing records found. This guide saves settings and preserves your data.", setupClean:"Start with empty records: no preset moods, routines or relationship scores.", setupAgent:"Connect an agent", setupAgentHint:"Enable companion tools for an agent, or do this later in Agent binding.", setupChoose:"Bind later", setupBindNext:"Bind and continue", setupModel:"Configure an AI model", setupModelHint:"Optionally share one inexpensive model across modules. You can configure it later in AI settings. Saving makes no model requests and preserves the existing automatic-update switch.", setupNext:"Next", setupBack:"Back", setupLater:"Set up later", setupFinish:"Finish setup", setupMissingModel:"Enter both API URL and model name, or choose Set up later.", orgUseShared:"Shared model", noScore:"Not recorded",
+      setupTitle:"Start your companion journal", setupOpen:"Getting started", quickSetup:"Quick setup", navMore:"More", setupStep:"Step {step} of 4",
+      setupLife:"Turn on the life engine", setupLifeHint:"Sleep, hunger and energy evolve with the clock and today's schedule. Rule-based: no model calls, no token cost, switch off anytime.", setupLifeNow:"Turn on now", setupLifeOn:"On", setupModelOptional:"Configure an AI model (optional)", setupNames:"Get acquainted", setupNamesHint:"Names are optional. Start with real conversations and experiences.", setupUser:"Your name", setupCompanion:"Companion name", setupExisting:"Existing records found. This guide saves settings and preserves your data.", setupClean:"Start with empty records: no preset moods, routines or relationship scores.", setupAgent:"Connect an agent", setupAgentHint:"Enable companion tools for an agent, or do this later in Agent binding.", setupChoose:"Bind later", setupBindNext:"Bind and continue", setupModel:"Configure an AI model", setupModelHint:"Optionally share one inexpensive model across modules. You can configure it later in AI settings. Saving makes no model requests and preserves the existing automatic-update switch.", setupNext:"Next", setupBack:"Back", setupLater:"Set up later", setupFinish:"Finish setup", setupMissingModel:"Enter both API URL and model name, or choose Set up later.", orgUseShared:"Shared model", noScore:"Not recorded",
       tabOrganizer:"AI settings", orgIntro:"Use an independent small model to organize recent chats. Recent text is sent to your configured API. Each enabled module makes at most one request, up to six per run. Provider pricing applies.",
       orgBase:"API base URL (e.g. https://example.com/v1)", orgModel:"Model name", orgKey:"API key (blank keeps the saved key)", orgKeySaved:"Key saved", orgKeyEmpty:"No key (local keyless endpoints supported)", orgKeyClear:"Clear saved key", orgInherit:"Blank inherits shared settings. A different endpoint does not inherit the shared key.",
       orgAgent:"Target agent", orgChooseAgent:"Choose a bound agent", orgChat:"Recent conversation", orgChooseChat:"Choose a conversation", orgAuto:"Organize after chats automatically", orgAutoHint:"Off by default. Runs after the selected agent finishes a chat, subject to the minimum interval; unchanged text is skipped. Changes are applied automatically, retaining 10 rotating backups.",
@@ -155,6 +164,13 @@
       scheduleHint: "Your plans in time order. Adjust them as life happens.", notesHint: "Small thoughts and important reminders, kept close.",
       dreamsHint: "Save a little of the world you wake up from.", datesHint: "Keep the days that matter within reach.",
       staleSchedule: "These plans are dated {date}. Check before following them.", records: "{count} records",
+      routineOn: "Daily routine: on ({count} items)", routineOff: "Daily routine: off",
+      routineSave: "Save as routine", routineDisable: "Disable routine", routineEnable: "Enable routine",
+      routineApply: "Apply to today", routineApplyConfirm: "This replaces today's plans with the routine template. Continue?",
+      routineSaved: "Saved as routine; today's plans will be generated automatically from tomorrow",
+      routineDisabled: "Daily routine disabled", routineEnabled: "Daily routine enabled",
+      routineApplied: "Today's plans regenerated from the routine",
+      routineHint: "A routine gives every day a schedule so the life engine keeps evolving across days; manual edits made today are never overwritten.",
       summaryMood: "Current mood", summaryEnergy: "Energy today", summaryWarmth: "Relationship warmth",
       openSection: "Open", summaryEmpty: "Start small. One record is enough.", viewAll: "View all",
 
@@ -362,6 +378,9 @@
     updateState: function (d) { return apiFetch("/companion-core/state", { method: "PUT", body: d }); },
     getSchedule: function () { return apiFetch("/companion-core/schedule"); },
     updateSchedule: function (d) { return apiFetch("/companion-core/schedule", { method: "PUT", body: d }); },
+    getRoutine: function () { return apiFetch("/companion-core/routine"); },
+    updateRoutine: function (d) { return apiFetch("/companion-core/routine", { method: "PUT", body: d }); },
+    applyRoutineToday: function () { return apiFetch("/companion-core/routine/apply-today", { method: "POST", body: {} }); },
     listDreams: function () { return apiFetch("/companion-core/dreams"); },
     getDream: function (d) { return apiFetch("/companion-core/dreams/" + encodeURIComponent(d)); },
     createDream: function (d) { return apiFetch("/companion-core/dreams", { method: "POST", body: d }); },
@@ -658,6 +677,45 @@
 
   // ── Tab: Schedule ────────────────────────────────────────────────────
 
+  function RoutineBar(props) {
+    var t = props.t, C = props.C, plan = props.plan, onSaved = props.onSaved;
+    var r = useAsync(api.getRoutine, []);
+    var _b = useState(false), busy = _b[0], setBusy = _b[1];
+    if (r.loading) return null;
+    var routine = r.data || {};
+    var enabled = !!routine.enabled;
+    var count = (routine.plan || []).length;
+
+    function act(promise, okKey) {
+      if (busy) return;
+      setBusy(true);
+      promise
+        .then(function () { message.success(t(okKey)); r.retry(); if (onSaved) onSaved(); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setBusy(false); });
+    }
+
+    return h("div", { style: Object.assign({}, panelStyle(C), { padding: "10px 12px", marginBottom: 10 }) },
+      h("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } },
+        h(Tag, { color: enabled ? "green" : "default" },
+          enabled ? t("routineOn", { count: count }) : t("routineOff")),
+        h(Space, { wrap: true },
+          h(Button, { size: "small", disabled: busy || !plan.length, onClick: function () {
+              act(api.updateRoutine({ enabled: true, plan: plan }), "routineSaved");
+            } }, t("routineSave")),
+          enabled
+            ? h(Button, { size: "small", disabled: busy, onClick: function () {
+                act(api.updateRoutine({ enabled: false }), "routineDisabled");
+              } }, t("routineDisable"))
+            : h(Button, { size: "small", disabled: busy || !count, onClick: function () {
+                act(api.updateRoutine({ enabled: true }), "routineEnabled");
+              } }, t("routineEnable")),
+          enabled ? h(Popconfirm, { title: t("routineApplyConfirm"), onConfirm: function () {
+              act(api.applyRoutineToday(), "routineApplied");
+            } }, h(Button, { size: "small", type: "link", disabled: busy }, t("routineApply"))) : null),
+        h("span", { style: { flexBasis: "100%", color: C.sub, fontSize: 12 } }, t("routineHint"))));
+  }
+
   function ScheduleTab(props) {
     var t = props.t, C = props.C;
     var s = useAsync(api.getSchedule, []);
@@ -702,6 +760,7 @@
     return h("div", {},
       h(SectionIntro, {C:C}, t("scheduleHint")),
       data.date && data.date !== localToday() ? h("p", {role:"status",style:{color:C.accent}},t("staleSchedule",{date:data.date})) : null,
+      h(RoutineBar, { t: t, C: C, plan: plan, onSaved: s.retry }),
       h(Toolbar, {
         left: h(Space, { wrap: true },
           h(Button, { size: "small", type: "primary", onClick: function () { setEditingIndex(null); setForm({time:"",activity:"",mood:""}); setModalOpen(true); } }, t("newSchedule")),
@@ -1071,8 +1130,9 @@
     var fs=useState(null),config=fs[0],setConfig=fs[1];
     var bs=useState(false),busy=bs[0],setBusy=bs[1];
     var es=useState(""),error=es[0],setError=es[1];
-    var s=useAsync(function(){return Promise.all([api.agents().catch(function(e){return {agents:[],reason:e.message};}),api.organizerConfig()]);},[]);
-    useEffect(function(){if(s.data){setConfig(s.data[1].config);setAgent(s.data[1].config.agent_id||"");}},[s.data]);
+    var ls=useState(false),lifeOn=ls[0],setLifeOn=ls[1];
+    var s=useAsync(function(){return Promise.all([api.agents().catch(function(e){return {agents:[],reason:e.message};}),api.organizerConfig(),api.getLife().catch(function(){return {enabled:false};})]);},[]);
+    useEffect(function(){if(s.data){setConfig(s.data[1].config);setAgent(s.data[1].config.agent_id||"");setLifeOn(!!(s.data[2]&&s.data[2].enabled));}},[s.data]);
     function act(fn){if(busy)return;setBusy(true);setError("");fn().catch(function(e){setError(e.message);}).then(function(){setBusy(false);});}
     function complete(later){act(function(){
       var save=Promise.resolve();
@@ -1084,9 +1144,14 @@
     });}
     function next(){
       if(step===0){setStep(1);return;}
-      if(!agent){setStep(2);return;}
-      act(function(){return api.bindAgent(agent,true).then(function(){setStep(2);});});
+      if(step===1){
+        if(!agent){setStep(2);return;}
+        act(function(){return api.bindAgent(agent,true).then(function(){setStep(2);});});
+        return;
+      }
+      if(step===2){setStep(3);return;}
     }
+    function toggleLife(){act(function(){return api.putLife(!lifeOn).then(function(){setLifeOn(!lifeOn);});});}
     function input(label,value,onChange,password){return h("div",{style:{marginBottom:18}},h(EditorRow,{label:label,C:C},h(Input,{"aria-label":label,type:password?"password":"text",autoComplete:password?"new-password":"off",maxLength:password?4000:200,value:value,disabled:busy,onChange:function(e){onChange(e.target.value);}})));}
     function setting(key,value){setConfig(Object.assign({},config,(function(){var update={};update[key]=value;return update;})()));}
     var agents=s.data?(s.data[0].agents||[]):[];
@@ -1102,14 +1167,17 @@
           h("select",{"aria-label":t("setupAgent"),value:agent,disabled:busy,style:{width:"100%",padding:10,borderRadius:8,background:C.cardBg,color:C.text},onChange:function(e){setAgent(e.target.value);}},
             h("option",{value:""},t("setupChoose")),agents.filter(function(a){return a.agent_enabled!==false && !a.error;}).map(function(a){return h("option",{key:a.id,value:a.id},a.name+" ("+a.id+")");})),
         s.data && s.data[0].reason?h("p",null,s.data[0].reason):null):null,
-      step===2?h("div",{},h("h3",null,t("setupModel")),h("p",{style:{lineHeight:1.7}},t("setupModelHint")),
+      step===2?h("div",{},h("h3",null,t("setupLife")),h("p",{style:{lineHeight:1.7}},t("setupLifeHint")),
+        h(Button,{type:lifeOn?"default":"primary",loading:busy,disabled:busy,onClick:toggleLife,style:{marginTop:8}},lifeOn?"✓ "+t("setupLifeOn"):t("setupLifeNow")),
+        h("p",{style:{color:C.sub,marginTop:12}},t("lifeNoSchedule"))):null,
+      step===3?h("div",{},h("h3",null,t("setupModelOptional")),h("p",{style:{lineHeight:1.7}},t("setupModelHint")),
         config?h("div",{},input(t("orgBase"),config.base_url,function(v){setting("base_url",v);}),input(t("orgModel"),config.model,function(v){setting("model",v);}),
           input(t("orgKey"),config.api_key,function(v){setting("api_key",v);},true),config.api_key_configured?h("p",null,t("orgKeySaved")):null):
           s.error?h(ErrorBlock,{t:t,C:C,error:s.error,onRetry:s.retry}):h(LoadingBlock,{t:t,C:C})):null,
       h("div",{style:{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"flex-end",marginTop:24}},
         h(Button,{disabled:busy,onClick:function(){complete(true);}},t("setupLater")),
         step>0?h(Button,{disabled:busy,onClick:function(){setError("");setStep(step-1);}},t("setupBack")):null,
-        step<2?h(Button,{type:"primary",loading:busy,disabled:busy,onClick:next},t(step===1 && agent?"setupBindNext":"setupNext")):
+        step<3?h(Button,{type:"primary",loading:busy,disabled:busy,onClick:next},t(step===1 && agent?"setupBindNext":"setupNext")):
           h(Button,{type:"primary",loading:busy,disabled:busy||!config,onClick:function(){complete(false);}},t("setupFinish"))));
   }
 
@@ -1516,6 +1584,8 @@
   function CompanionApp() {
     var careSuggestionState=useState(null),careSuggestion=careSuggestionState[0],setCareSuggestion=careSuggestionState[1];
     var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
+    var PRIMARY_TABS = ["overview","state","schedule","notes","dreams","relationship","dates","checkup"];
+    function navigate(key) { setActiveTab(key); }
     var _rev = useState(0), revision = _rev[0], setRevision = _rev[1];
     var setupState=useState(null),setupData=setupState[0],setSetupData=setupState[1];
     var setupOpenState=useState(false),setupOpen=setupOpenState[0],setSetupOpen=setupOpenState[1];
@@ -1545,9 +1615,21 @@
           h("h1",null,t("appTitle"),h("span",{className:"cc-version"},version ? "v"+version : "")),
           h("p",null,setupData && setupData.profile && (setupData.profile.user_name || setupData.profile.companion_name)?[setupData.profile.companion_name,setupData.profile.user_name].filter(Boolean).join(" · "):t("welcome"))),
         h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")),h("div",{className:"cc-project-links",style:{marginTop:12}},
-          h(Button,{size:"small",onClick:function(){setSetupOpen(true);}},t("setupOpen")),
-          h(ProjectLink,{href:PROJECT_URL,label:"GitHub"}),
-          h(Button,{size:"small",onClick:function(){setActiveTab("about");}},t("tabAbout"))))),
+          h(Button,{type:"primary",size:"small",onClick:function(){setSetupOpen(true);}},t("quickSetup")),
+          Dropdown?h(Dropdown,{menu:{items:[
+            {key:"setup",label:t("setupOpen"),onClick:function(){setSetupOpen(true);}},
+            {key:"checkup",label:t("tabCheckup"),onClick:function(){navigate("checkup");}},
+            {type:"divider"},
+            {key:"timeline",label:t("tabTimeline"),onClick:function(){navigate("timeline");}},
+            {key:"milestones",label:t("bfMilestones"),onClick:function(){navigate("milestones");}},
+            {key:"care",label:t("tabCare"),onClick:function(){navigate("care");}},
+            {key:"organizer",label:t("tabOrganizer"),onClick:function(){navigate("organizer");}},
+            {key:"agents",label:t("tabAgents"),onClick:function(){navigate("agents");}},
+            {key:"data",label:t("tabData"),onClick:function(){navigate("data");}},
+            {type:"divider"},
+            {key:"github",label:"GitHub",onClick:function(){if(typeof window!=="undefined"&&window.open)window.open(PROJECT_URL,"_blank");}},
+            {key:"about",label:t("tabAbout"),onClick:function(){navigate("about");}}
+          ]}},h(Button,{size:"small"},"⋯ "+t("navMore"))):null))),
       h(Tabs, {
         className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
         destroyInactiveTabPane:true,
@@ -1567,7 +1649,7 @@
           {key:'care',label:'📣 '+t('tabCare'),children:h(CareTab,{t:t,C:C,suggestion:careSuggestion})},
           {key:'checkup',label:'🩺 '+t('tabCheckup'),children:h(CheckupTab,{t:t,C:C,navigate:setActiveTab})},
           { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },
-        ],
+        ].filter(function(it){return PRIMARY_TABS.indexOf(it.key)>=0||it.key===activeTab;}),
       }));
   }
 

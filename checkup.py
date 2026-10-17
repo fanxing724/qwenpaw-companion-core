@@ -61,6 +61,17 @@ def install(router, owner, life):
                                "状态自动演化未开启，状态不会随时间变化",
                                {"kind": "auto", "item": "enable_life"}))
 
+        # 4.5 作息模板（生活引擎跨日自动化的前提）
+        routine = c["_read_yaml"](c["_DATA_DIR"] / "routine.yaml") or {}
+        routine_plan = routine.get("plan") or []
+        if routine.get("enabled") and routine_plan:
+            items.append(_item("routine", "作息模板", "ok",
+                               f"已启用（{len(routine_plan)} 条），跨日自动生成今日日程"))
+        elif life_cfg.get("enabled"):
+            items.append(_item("routine", "作息模板", "warn",
+                               "生活引擎已开启但没有作息模板：跨日后没有今日日程就不会演化",
+                               {"kind": "auto", "item": "routine_from_today"}))
+
         # 5. 智能体绑定与技能
         if c["app"] is not None:
             try:
@@ -74,9 +85,15 @@ def install(router, owner, life):
                         items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "ok",
                                            "已绑定工具，技能已安装"))
                     elif row["binding"] == "bound":
-                        items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
-                                           f"工具已绑定，但技能未就绪：{skill.get('reason', skill['status'])}",
-                                           {"kind": "auto", "item": "install_skill", "agent_id": agent_id}))
+                        if skill["status"] == "conflict":
+                            items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
+                                               f"工具已绑定，但技能文件与扩展自带版本不一致（{skill.get('reason', '')}）；"
+                                               "一键修复会用扩展自带版本覆盖该副本",
+                                               {"kind": "auto", "item": "update_skill", "agent_id": agent_id}))
+                        else:
+                            items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
+                                               f"工具已绑定，但技能未就绪：{skill.get('reason', skill['status'])}",
+                                               {"kind": "auto", "item": "install_skill", "agent_id": agent_id}))
                     else:
                         items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
                                            f"未绑定（{row['binding']}），聊天中无法使用陪伴工具",
@@ -112,6 +129,18 @@ def install(router, owner, life):
             life.write(cfg)
             life.maybe_evolve()
             return {"fixed": True, "message": "生活引擎已开启，状态将随时间与日程自动演化"}
+        if payload.item == "routine_from_today":
+            # _write_yaml 约定由调用方持锁序列化；这里显式取 _lock。
+            with c["_lock"]:
+                schedule = c["_read_yaml"](c["_DATA_DIR"] / "schedule.yaml") or {}
+                plan = schedule.get("plan") or []
+                if not plan:
+                    return {"fixed": False,
+                            "message": "今日日程为空，请先在日程页添加安排，再保存为作息模板"}
+                c["_write_yaml"](c["_DATA_DIR"] / "routine.yaml",
+                                 {"enabled": True, "plan": plan})
+            return {"fixed": True,
+                    "message": f"已用今日日程生成作息模板（{len(plan)} 条）并启用，明天起自动生成"}
         if payload.item == "bind_agent" and payload.agent_id:
             row = c["_apply_binding"](payload.agent_id, True)
             skill = c["_skill_sync"](payload.agent_id, True)
@@ -125,6 +154,14 @@ def install(router, owner, life):
             reloaded = c["_request_agent_reload"](request, payload.agent_id)
             return {"fixed": True, "reload_scheduled": reloaded,
                     "message": f"技能已安装：{payload.agent_id}", "result": result}
+        if payload.item == "update_skill" and payload.agent_id:
+            # 用户显式点击：用扩展自带版本覆盖不一致的旧副本
+            result = c["_skill_sync"](payload.agent_id, True, True)
+            reloaded = c["_request_agent_reload"](request, payload.agent_id)
+            return {"fixed": result["status"] == "updated", "reload_scheduled": reloaded,
+                    "message": f"技能已更新为扩展自带版本：{payload.agent_id}"
+                    if result["status"] == "updated" else result.get("reason", "技能未更新"),
+                    "result": result}
         return {"fixed": False, "message": "该项不支持一键修复"}
 
     return get_checkup

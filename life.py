@@ -166,6 +166,10 @@ class Life:
 
     def preview(self):
         cfg = self.read()
+        # 先按作息模板物化今日日程；必须在取 _lock 之前调用（内部会自行加锁）。
+        ensure = self.c.get("_ensure_today_schedule")
+        if callable(ensure):
+            ensure()
         with self.c["_lock"]:
             state = self.c["_read_yaml"](self.c["_DATA_DIR"] / "state.yaml") or {}
             schedule = self.c["_read_yaml"](self.c["_DATA_DIR"] / "schedule.yaml") or {}
@@ -184,6 +188,11 @@ class Life:
                 cfg = self.read()
                 if not cfg.get("enabled"):
                     return None
+                # 跨日后先按作息模板补出今日日程，否则无日程不演化。
+                # 必须在取 _lock 之前调用（内部会自行加锁）。
+                ensure = self.c.get("_ensure_today_schedule")
+                if callable(ensure):
+                    ensure()
                 with self.c["_lock"]:
                     state = self.c["_read_yaml"](self.c["_DATA_DIR"] / "state.yaml") or {}
                     schedule = self.c["_read_yaml"](self.c["_DATA_DIR"] / "schedule.yaml") or {}

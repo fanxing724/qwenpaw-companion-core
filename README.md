@@ -21,6 +21,7 @@
 
 - 🌤 **状态管理** - 心情、精力、睡眠、健康等状态追踪，仪表盘可直接编辑
 - 📅 **日程安排** - 每日计划时间线展示
+- ⏰ **作息模板** - 保存一份日常作息，跨日自动生成今日日程，让生活引擎无人值守持续演化（当天手动修改不被覆盖）
 - 💭 **梦境记录** - 按日期存储的梦境碎片，支持全文查看
 - 📝 **便签系统** - 可设置过期时间的便签，支持提醒标记与过期清理
 - 💕 **关系记录** - 亲密度、里程碑、互动记录
@@ -35,6 +36,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
+- v2.11.0：作息模板（跨日自动生成今日日程，生活引擎无需每天手填即可持续演化）；仪表盘导航精简为 8 个主标签 + 「更多」菜单；使用引导新增“开启生活引擎”一步。
 - v2.10.1：生活引擎（状态自动演化，可选）、技能随绑定自动安装、检查界面（自检与一键修复）；修复绑定接口自死锁与跨天演化误覆盖手动字段。
 - v2.9.0：稳定测试版，真机验收完成；修复 Actions artifact 双层 ZIP 无法直装的问题，安装包瘦身至 19 个文件，插件功能与 2.8.2 一致。
 - v2.8.1：新增每日历史归档、日记时间线、持久化首见、可解释计分、宿主模型发现与可选关怀任务。
@@ -51,10 +53,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.10.1.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.11.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.10.1.zip
+qwenpaw plugin install /path/to/companion-core-2.11.0.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -83,7 +85,9 @@ qwenpaw plugin install --force /path/to/companion-core
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/api/companion-core/state` | GET/PUT | 状态读写（PUT 为增量合并） |
-| `/api/companion-core/schedule` | GET/PUT | 日程读写 |
+| `/api/companion-core/schedule` | GET/PUT | 日程读写（GET 时若启用作息模板且今日无日程，自动按模板生成） |
+| `/api/companion-core/routine` | GET/PUT | 作息模板读写：启用后每天自动物化今日日程，生活引擎得以跨日持续演化；当天手动修改不被覆盖 |
+| `/api/companion-core/routine/apply-today` | POST | 显式用模板重建今日日程（会覆盖当天已有安排） |
 | `/api/companion-core/dreams` | GET/POST | 梦境列表/创建 |
 | `/api/companion-core/dreams/{date}` | GET | 指定日期梦境 |
 | `/api/companion-core/notes` | GET/POST | 便签列表（`?expired=true` 含过期）/创建 |
