@@ -26,7 +26,6 @@
   var useHostTheme = typeof host.useTheme === "function" ? host.useTheme : function () { return { isDark: false }; };
 
   var Button = antd.Button;
-  var Dropdown = antd.Dropdown;
   var Empty = antd.Empty;
   var Input = antd.Input;
   var InputNumber = antd.InputNumber;
@@ -1552,9 +1551,11 @@
 .cc-app *{box-sizing:border-box}.cc-hero{display:flex;justify-content:space-between;gap:24px;align-items:center;padding:32px;border:1px solid rgba(236,72,153,.12);border-radius:24px;background:linear-gradient(115deg,rgba(236,72,153,.09),rgba(251,191,36,.06));margin-bottom:24px;position:relative;overflow:hidden}
 .cc-eyebrow{font-size:11px;letter-spacing:.12em;color:var(--cc-sub);font-weight:600}.cc-hero h1{margin:12px 0 8px;font-size:30px;letter-spacing:-.04em;line-height:1.3}.cc-version{font-size:11px;letter-spacing:0;font-weight:400;color:var(--cc-sub);margin-left:12px}.cc-hero p{margin:0;color:var(--cc-sub);font-size:14px}.cc-today{text-align:right;max-width:260px}.cc-today>span{display:block;font-variant-numeric:tabular-nums;font-size:22px;font-weight:600}.cc-today small{display:block;margin-top:8px;color:var(--cc-sub);line-height:1.7}
 .cc-tabs>.ant-tabs-nav{margin-bottom:24px}.cc-tabs .ant-tabs-tab{padding:12px 4px;font-size:14px}.cc-tabs .ant-tabs-ink-bar{background:var(--cc-accent)}.cc-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn{color:var(--cc-accent)}
+.cc-tabs>.qwenpaw-tabs-nav{margin-bottom:24px}.cc-tabs .qwenpaw-tabs-tab{padding:12px 4px;font-size:14px}.cc-tabs .qwenpaw-tabs-ink-bar{background:var(--cc-accent)}.cc-tabs .qwenpaw-tabs-tab.qwenpaw-tabs-tab-active .qwenpaw-tabs-tab-btn{color:var(--cc-accent)}
 .cc-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}.cc-metric{text-align:left;display:flex;flex-direction:column;position:relative;gap:12px;padding:22px 20px;background:var(--cc-card);color:var(--cc-text);border:1px solid rgba(127,127,127,.14);border-radius:18px;cursor:pointer;min-width:0;font:inherit;transition:transform .18s,border-color .18s}.cc-metric:hover{transform:translateY(-3px);border-color:var(--cc-accent)}.cc-metric:focus-visible{outline:2px solid var(--cc-accent);outline-offset:3px}.cc-metric strong{font-size:25px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}.cc-metric-icon{position:absolute;right:18px;top:16px;font-size:22px;color:var(--cc-accent)}.cc-metric .cc-eyebrow{padding-right:22px;letter-spacing:0}.cc-metric-detail{font-size:12px;color:var(--cc-sub);line-height:1.6;overflow-wrap:anywhere}.cc-overview-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px}.cc-timeline-row{display:flex;gap:20px;padding:15px 0;border-bottom:1px solid rgba(127,127,127,.1);overflow-wrap:anywhere}.cc-timeline-row time{font-variant-numeric:tabular-nums;color:var(--cc-accent);font-weight:600;flex-shrink:0}.cc-date-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid rgba(127,127,127,.1)}.cc-date-row small{display:block;color:var(--cc-sub);margin-top:5px}.cc-note-preview{padding:14px 16px;background:rgba(236,72,153,.04);border-left:3px solid var(--cc-accent);border-radius:4px 10px 10px 4px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.cc-search-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.cc-app .ant-btn{border-radius:8px}.cc-app .ant-input,.cc-app .ant-input-affix-wrapper{border-radius:8px}.cc-app section{min-width:0}.cc-app .ant-tabs-content-holder{min-width:0}
 @media(max-width:760px){.cc-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.cc-overview-grid{grid-template-columns:1fr}.cc-hero{padding:24px}.cc-today{display:none}.cc-hero h1{font-size:26px}.cc-app{padding-top:16px}.cc-app .ant-space{flex-wrap:wrap}.cc-app .ant-tabs-tab+.ant-tabs-tab{margin-left:20px}}
 .cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap{overflow:visible}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.ant-tabs-nav .ant-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.ant-tabs-nav .ant-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-operations,.cc-tabs>.ant-tabs-nav .ant-tabs-ink-bar{display:none}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:before,.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:after{display:none}
+.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-wrap{overflow:visible}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-operations,.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-ink-bar{display:none}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-wrap:before,.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-wrap:after{display:none}
 @media(max-width:420px){.cc-metric{padding:16px 12px}.cc-metric strong{font-size:21px}.cc-metric-icon{right:12px;top:12px}.cc-hero{padding:20px}.cc-hero h1{font-size:24px}}
 @media(prefers-reduced-motion:reduce){.cc-metric{transition:none}}
 .cc-project-links{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.cc-today .cc-project-links{justify-content:flex-end}.cc-project-link{color:var(--cc-accent);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}.cc-project-link:focus-visible{outline:2px solid var(--cc-accent);outline-offset:4px}.cc-about{padding:24px;background:var(--cc-card);border-radius:16px;line-height:1.8;color:var(--cc-text)}.cc-about h2{margin-top:0}.cc-credit{font-weight:600}.cc-about nav{margin:20px 0}
@@ -1584,7 +1585,6 @@
   function CompanionApp() {
     var careSuggestionState=useState(null),careSuggestion=careSuggestionState[0],setCareSuggestion=careSuggestionState[1];
     var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
-    var PRIMARY_TABS = ["overview","state","schedule","notes","dreams","relationship","dates","checkup"];
     function navigate(key) { setActiveTab(key); }
     var _rev = useState(0), revision = _rev[0], setRevision = _rev[1];
     var setupState=useState(null),setupData=setupState[0],setSetupData=setupState[1];
@@ -1616,20 +1616,8 @@
           h("p",null,setupData && setupData.profile && (setupData.profile.user_name || setupData.profile.companion_name)?[setupData.profile.companion_name,setupData.profile.user_name].filter(Boolean).join(" · "):t("welcome"))),
         h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")),h("div",{className:"cc-project-links",style:{marginTop:12}},
           h(Button,{type:"primary",size:"small",onClick:function(){setSetupOpen(true);}},t("quickSetup")),
-          Dropdown?h(Dropdown,{menu:{items:[
-            {key:"setup",label:t("setupOpen"),onClick:function(){setSetupOpen(true);}},
-            {key:"checkup",label:t("tabCheckup"),onClick:function(){navigate("checkup");}},
-            {type:"divider"},
-            {key:"timeline",label:t("tabTimeline"),onClick:function(){navigate("timeline");}},
-            {key:"milestones",label:t("bfMilestones"),onClick:function(){navigate("milestones");}},
-            {key:"care",label:t("tabCare"),onClick:function(){navigate("care");}},
-            {key:"organizer",label:t("tabOrganizer"),onClick:function(){navigate("organizer");}},
-            {key:"agents",label:t("tabAgents"),onClick:function(){navigate("agents");}},
-            {key:"data",label:t("tabData"),onClick:function(){navigate("data");}},
-            {type:"divider"},
-            {key:"github",label:"GitHub",onClick:function(){if(typeof window!=="undefined"&&window.open)window.open(PROJECT_URL,"_blank");}},
-            {key:"about",label:t("tabAbout"),onClick:function(){navigate("about");}}
-          ]}},h(Button,{size:"small"},"⋯ "+t("navMore"))):null))),
+          h(ProjectLink,{href:PROJECT_URL,label:"GitHub"}),
+          h(Button,{size:"small",onClick:function(){setActiveTab("about");}},t("tabAbout"))))),
       h(Tabs, {
         className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
         destroyInactiveTabPane:true,
@@ -1649,7 +1637,7 @@
           {key:'care',label:'📣 '+t('tabCare'),children:h(CareTab,{t:t,C:C,suggestion:careSuggestion})},
           {key:'checkup',label:'🩺 '+t('tabCheckup'),children:h(CheckupTab,{t:t,C:C,navigate:setActiveTab})},
           { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },
-        ].filter(function(it){return PRIMARY_TABS.indexOf(it.key)>=0||it.key===activeTab;}),
+        ],
       }));
   }
 
