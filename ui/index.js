@@ -26,6 +26,7 @@
   var useHostTheme = typeof host.useTheme === "function" ? host.useTheme : function () { return { isDark: false }; };
 
   var Button = antd.Button;
+  var Dropdown = antd.Dropdown;
   var Empty = antd.Empty;
   var Input = antd.Input;
   var InputNumber = antd.InputNumber;
@@ -1586,6 +1587,8 @@
     var careSuggestionState=useState(null),careSuggestion=careSuggestionState[0],setCareSuggestion=careSuggestionState[1];
     var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
     function navigate(key) { setActiveTab(key); }
+    // 重要页签常显；其余收进头部「更多」菜单，避免主导航拥挤。
+    var PRIMARY_TABS = ["overview","state","schedule","notes","dreams","relationship","dates","checkup"];
     var _rev = useState(0), revision = _rev[0], setRevision = _rev[1];
     var setupState=useState(null),setupData=setupState[0],setSetupData=setupState[1];
     var setupOpenState=useState(false),setupOpen=setupOpenState[0],setSetupOpen=setupOpenState[1];
@@ -1616,8 +1619,20 @@
           h("p",null,setupData && setupData.profile && (setupData.profile.user_name || setupData.profile.companion_name)?[setupData.profile.companion_name,setupData.profile.user_name].filter(Boolean).join(" · "):t("welcome"))),
         h("div",{className:"cc-today"},h("span",null,localToday()),h("small",null,t("overviewHint")),h("div",{className:"cc-project-links",style:{marginTop:12}},
           h(Button,{type:"primary",size:"small",onClick:function(){setSetupOpen(true);}},t("quickSetup")),
-          h(ProjectLink,{href:PROJECT_URL,label:"GitHub"}),
-          h(Button,{size:"small",onClick:function(){setActiveTab("about");}},t("tabAbout"))))),
+          Dropdown?h(Dropdown,{menu:{items:[
+            {key:"setup",label:t("setupOpen"),onClick:function(){setSetupOpen(true);}},
+            {key:"checkup",label:t("tabCheckup"),onClick:function(){navigate("checkup");}},
+            {type:"divider"},
+            {key:"timeline",label:t("tabTimeline"),onClick:function(){navigate("timeline");}},
+            {key:"milestones",label:t("bfMilestones"),onClick:function(){navigate("milestones");}},
+            {key:"care",label:t("tabCare"),onClick:function(){navigate("care");}},
+            {key:"organizer",label:t("tabOrganizer"),onClick:function(){navigate("organizer");}},
+            {key:"agents",label:t("tabAgents"),onClick:function(){navigate("agents");}},
+            {key:"data",label:t("tabData"),onClick:function(){navigate("data");}},
+            {type:"divider"},
+            {key:"github",label:"GitHub",onClick:function(){if(typeof window!=="undefined"&&window.open)window.open(PROJECT_URL,"_blank");}},
+            {key:"about",label:t("tabAbout"),onClick:function(){navigate("about");}}
+          ]}},h(Button,{size:"small"},"⋯ "+t("navMore"))):null))),
       h(Tabs, {
         className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
         destroyInactiveTabPane:true,
@@ -1637,7 +1652,7 @@
           {key:'care',label:'📣 '+t('tabCare'),children:h(CareTab,{t:t,C:C,suggestion:careSuggestion})},
           {key:'checkup',label:'🩺 '+t('tabCheckup'),children:h(CheckupTab,{t:t,C:C,navigate:setActiveTab})},
           { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },
-        ],
+        ].filter(function(it){return PRIMARY_TABS.indexOf(it.key)>=0||it.key===activeTab;}),
       }));
   }
 

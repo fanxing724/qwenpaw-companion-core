@@ -26,8 +26,8 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   const route = calls.find(c => c[0] === 'route')[1][0];
   assert.equal(route.id, 'companion-core.home');
   const tree = route.component();
-  // All tabs are always visible; nothing is hidden behind a "more" menu.
-  assert.equal(tree.children.at(-1).props.items.length, 15);
+  // Primary tabs stay visible; secondary pages live in the header "more" menu.
+  assert.equal(tree.children.at(-1).props.items.length, 8);
   effects[0]();
   await new Promise(resolve => setImmediate(resolve));
   const base = mode === 'base-path' ? '/paw/api' : '/api';
@@ -39,7 +39,7 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   assert.equal(requests.at(-1), base + mount + '/companion-core/state', mode);
   assert.equal(requests.length, 4, 'one discovery probe and no mutation retries');
 }
-console.log('Frontend: 7 host modes, routes, full nav (15 tabs, nothing hidden) and health API passed');
+console.log('Frontend: 7 host modes, routes, primary nav (8 tabs) + more menu for secondary pages and health API passed');
 
 // Evaluate date helpers in isolation without adding production globals.
 const helperContext = {window:{QwenPaw:{host:{React:{createElement(){}, useState(){}, useEffect(){}},antd:{Input:{}}}}},console};
