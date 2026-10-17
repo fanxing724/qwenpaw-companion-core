@@ -36,6 +36,7 @@
 ## 📦 版本要求
 
 - QwenPaw ≥ 2.0.1（PawApp 框架）
+- v2.12.0：互动计分候选（工具互动/关怀投递进入可解释计分，确认制）、周回顾（当周真实记录起草）、模型用量统计页；互动记录与用量持久化并纳入权限收紧。
 - v2.11.0：陪伴日记（模型起草、预览确认、自动日记可选）与规划模式（一键起草作息+整理节奏+关怀建议）；新增「陪伴日记」页签与日程页「规划模式」入口。
 - v2.10.6：检查页修复补全——存储持久性按平台/本地部署标注、数据权限一键收紧、关怀任务一键重建、「一键修复全部」不碰绑定类操作。
 - v2.10.5：导航修复与自定义——修复宿主 `qwenpaw-tabs` 前缀导致的页签被折叠问题；折叠集合改为用户自选（自定义导航弹窗 + 收起开关，偏好持久化）；头部新增「⭐ 支持作者」与「🐞 反馈」（GitHub Issue / 平台社区）入口。
@@ -57,10 +58,10 @@
 
 ### 本地安装
 
-将 `companion-core-2.11.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
+将 `companion-core-2.12.0.zip` 交给 QwenPaw 的插件安装界面，或执行：
 
 ```bash
-qwenpaw plugin install /path/to/companion-core-2.11.0.zip
+qwenpaw plugin install /path/to/companion-core-2.12.0.zip
 # 覆盖安装已有版本
 qwenpaw plugin install --force /path/to/companion-core
 ```
@@ -120,6 +121,11 @@ qwenpaw plugin install --force /path/to/companion-core
 | `/api/companion-core/diary/settings` | GET/PUT | 自动日记开关、每日生成时间与 token 上限 |
 | `/api/companion-core/plan/preview` | POST | 规划模式预览：作息+整理节奏+关怀建议（无模型时规则草稿） |
 | `/api/companion-core/plan/apply` | POST | 应用作息与整理节奏；关怀只返回建议不自动写入 |
+| `/api/companion-core/weekly` | GET | 周回顾列表 |
+| `/api/companion-core/weekly/{week}` | GET/DELETE | 读取/删除某周回顾（YYYY-Www） |
+| `/api/companion-core/weekly/preview` | POST | 从当周真实记录起草周回顾（无记录不生成） |
+| `/api/companion-core/weekly/apply` | POST | 预览确认后写入；已有回顾拒绝覆盖 |
+| `/api/companion-core/usage` | GET | 模型用量按来源汇总 + 最近明细 |
 
 PawApp SDK 模式遵循官方 Creator 的路由约定，使用 `/api/companion-core/*`。旧版标准 router 加载器使用 `/api/plugins/companion-core/*`；仪表盘通过只读健康检查自动兼容这两种模式。外部脚本请按宿主实际加载模式选择前缀。
 

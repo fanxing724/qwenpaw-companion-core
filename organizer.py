@@ -257,7 +257,11 @@ class ChatOrganizer:
             result_json = json.loads(content)
             if not isinstance(result_json, dict) or set(result_json) != {'changes'}:
                 raise ValueError('invalid response envelope')
-            return result_json['changes'], result.get('usage', {})
+            usage = result.get('usage', {})
+            rec = self.c.get('_record_usage')
+            if rec is not None:
+                rec('organizer', usage)
+            return result_json['changes'], usage
         except HTTPError as exc:
             raise HTTPException(502, f'模型接口返回 HTTP {exc.code}，请检查 API、模型或额度') from None
         except Exception:

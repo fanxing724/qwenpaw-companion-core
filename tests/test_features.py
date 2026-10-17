@@ -598,3 +598,63 @@ def test_plan_rule_fallback_model_validation_and_apply(loaded,monkeypatch):
           'care':{'time':'02:00','quiet_start':'23:00','quiet_end':'08:00'}},{})
     monkeypatch.setattr(module.organizer,'complete',lambda *a: bad)
     assert client.post(prefix+'/plan/preview',json={}).status_code==502
+
+
+def test_interaction_logging_feeds_explainable_score_and_clamps(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    module._log_interaction('tool_call','alice')
+    module._log_interaction('tool_call','alice')
+    module._log_interaction('care_delivery','alice')
+    data=module._read_json(root/'interactions.json')
+    assert data[0]['count']==2 and data[0]['agents']['alice']==2
+    plan=client.get(prefix+'/relationship/score-preview').json()
+    tool=[p for p in plan['parts'] if '工具互动' in p['rule']]
+    care=[p for p in plan['parts'] if '关怀成功投递' in p['rule']]
+    assert tool and care and tool[0]['points']==2 and care[0]['points']==1
+    assert plan['proposed']==sum(p['points'] for p in plan['parts'])
+    # 证据堆满也不越界：里程碑+日期+互动全拉满仍 <=100
+    client.put(prefix+'/relationship',json={'warmth_score':10,'milestones':[
+        {'date':f'2026-01-{d:02d}','event':f'事件{d}'} for d in range(1,10)]})
+    client.post(prefix+'/dates',json={'name':'生日','date':'2000-02-04'})
+    for _ in range(20):
+        module._log_interaction('care_delivery','alice')
+    plan2=client.get(prefix+'/relationship/score-preview').json()
+    assert 10<=plan2['proposed']<=100
+    assert plan2['proposed']==sum(p['points'] for p in plan2['parts'])
+    applied=client.post(prefix+'/relationship/score-apply',json={'preview_id':plan2['preview_id'],'confirmed':True})
+    assert applied.status_code==200 and 10<=applied.json()['warmth_score']<=100
+
+
+def test_weekly_rule_summary_apply_conflict_and_validation(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    from datetime import date as _d
+    key='2026-W%d'%_d(2026,10,17).isocalendar()[1]
+    assert client.post(prefix+'/weekly/preview',json={'week':key}).status_code==400
+    module._write_yaml(root/'history'/'2026-10-16.yaml',{'state':{'date':'2026-10-16','mood':'平静','energy':70}})
+    body=client.post(prefix+'/weekly/preview',json={'week':key}).json()
+    assert body['source']=='rule' and '规则摘要' in body['text'] and body['exists'] is False
+    assert client.post(prefix+'/weekly/apply',json={'preview_id':body['preview_id']}).status_code==200
+    again=client.post(prefix+'/weekly/preview',json={'week':key}).json()
+    assert client.post(prefix+'/weekly/apply',json={'preview_id':again['preview_id']}).status_code==409
+    listing=client.get(prefix+'/weekly').json()
+    assert listing[0]['week']==key
+    assert client.get(prefix+'/weekly/'+key).json()['content'].startswith(key)
+    assert client.get(prefix+'/weekly/2026-W99').status_code==400
+    assert client.delete(prefix+'/weekly/'+key).status_code==200
+    assert client.get(prefix+'/weekly/'+key).status_code==404
+
+
+def test_usage_aggregates_per_source(loaded,monkeypatch):
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    module._record_usage('diary',{'total_tokens':50,'prompt_tokens':30,'completion_tokens':20})
+    module._record_usage('plan',{'total_tokens':70})
+    module._record_usage('diary',{})
+    usage=client.get(prefix+'/usage').json()
+    assert usage['totals']['diary']['calls']==2 and usage['totals']['diary']['total']==50
+    assert usage['totals']['plan']['total']==70
+    assert len(usage['recent'])==3

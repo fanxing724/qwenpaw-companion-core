@@ -129,11 +129,25 @@ class Features:
             except Exception:continue
         dates=list(unique_dates.values())
         days=max(0,(self.c['_now']().date()-min((date.fromisoformat(x['date']) for x in events),default=self.c['_now']().date())).days)
+        interactions=self.o.read_json(self.c['_DATA_DIR']/'interactions.json',[])
+        today=self.c['_now']().date()
+        def recent(item):
+            try:return 0<=(today-date.fromisoformat(item.get('date',''))).days<=6
+            except (ValueError,TypeError):return False
+        tool_days=sorted({x['date'] for x in interactions if isinstance(x,dict) and x.get('kind')=='tool_call' and recent(x)})
+        care_hits=[x for x in interactions if isinstance(x,dict) and x.get('kind')=='care_delivery' and recent(x)]
+        care_count=sum(int(x.get('count',0)) for x in care_hits)
         parts=[{'rule':'起始刻度（不代表感情评价）','points':10,'evidence':[]},
                {'rule':'已确认最早里程碑至今，每 7 天 +2，最多 20','points':min(20,days//7*2),'evidence':[min(events,key=lambda x:x['date'])] if events else []},
                {'rule':'每条已确认里程碑 +5，最多 40','points':min(40,len(events)*5),'evidence':events[:8]},
-               {'rule':'每个已记录重要日期 +3，最多 30','points':min(30,len(dates)*3),'evidence':dates[:10]}]
-        entry={'kind':'score','before':relation,'score':sum(x['points'] for x in parts)}
+               {'rule':'每个已记录重要日期 +3，最多 30','points':min(30,len(dates)*3),'evidence':dates[:10]},
+               {'rule':'近 7 天有工具互动的天数，每天 +2，最多 14','points':min(14,len(tool_days)*2),'evidence':[{'date':d} for d in tool_days[:7]]},
+               {'rule':'近 7 天关怀成功投递，每次 +1，最多 10','points':min(10,care_count),'evidence':care_hits[:10]}]
+        total=sum(x['points'] for x in parts)
+        clamped=max(10,min(100,total))
+        if clamped!=total:
+            parts.append({'rule':'总分截断到 [10,100]','points':clamped-total,'evidence':[]})
+        entry={'kind':'score','before':relation,'score':clamped}
         key=self.sources.store(self.pending,entry)
         return {'preview_id':key,'current':relation.get('warmth_score'),'proposed':entry['score'],'known_days':days,'parts':parts,
                 'notice':'仅按已确认记录计分，不从文件数量、模型猜测或生日推断亲密度。确认后才写入。'}

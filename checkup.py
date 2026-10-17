@@ -25,7 +25,7 @@ def _item(item_id, label, status, detail, fix=None):
 def _data_files(data_dir):
     """陪伴数据文件清单（与启动时权限收紧范围一致）。"""
     names = ["state.yaml", "schedule.yaml", "routine.yaml", "relationship.yaml",
-             "important_dates.yaml", "notes.json", "setup.json", "care-state.json",
+             "important_dates.yaml", "notes.json", "interactions.json", "setup.json", "care-state.json",
              "organizer-settings.json", "organizer-status.json"]
     paths = [data_dir / n for n in names]
     paths += sorted((data_dir / "dreams").glob("*.md")) if (data_dir / "dreams").is_dir() else []

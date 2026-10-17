@@ -393,6 +393,7 @@ class Care:
                 agent['queue']=[x for x in agent['queue'] if x['id'] not in ids]
                 agent['completed']=(agent.get('completed',[])+list(ids))[-2000:]
                 agent.update(sent_date=today,sent_count=count+1,status='channel-accepted');self.write(state)
+            self.c['_log_interaction']('care_delivery',agent_id)
             with self.lock:
                 with self.c['_lock']:
                     notes=self.c['_read_notes']();changed=False

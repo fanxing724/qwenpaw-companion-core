@@ -109,6 +109,7 @@ def install(router, owner, life):
         ]
         try:
             changes, usage = owner.complete(provider, messages, 900)
+            c["_record_usage"]("plan", usage)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(502, f"规划模型调用失败：{exc}") from None
         try:

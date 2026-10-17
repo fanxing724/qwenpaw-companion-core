@@ -221,6 +221,7 @@ def install(router, owner, life):
                 {"role": "user", "content": f"日期：{day}\n事实：\n" + "\n".join(facts)},
             ]
             text, usage = c["_diary_complete"](provider, messages, settings["tokens"])
+            c["_record_usage"]("diary", usage)
             if not text or len(text) > MAX_CHARS:
                 raise ValueError("empty or overlong model text")
             c["_write_text"](path, text)
@@ -356,6 +357,7 @@ def install(router, owner, life):
         try:
             text, usage = c["_diary_complete"](provider, messages, settings["tokens"])
         except HTTPException:
+            c["_record_usage"]("diary", usage)
             raise
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(502, f"模型调用失败：{exc}") from None

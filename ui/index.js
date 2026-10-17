@@ -92,6 +92,10 @@
       diaryEmpty: "还没有日记", diaryFromModel: "模型起草", diaryFromRule: "规则草稿", view: "查看",
       planTitle: "规划模式", planGenerate: "生成规划预览", planPreviewed: "规划预览已生成", planApply: "应用作息与整理节奏",
       planApplied: "规划已应用", planWeekend: "周末版", planOrganizer: "整理节奏：", planCare: "关怀建议时间：",
+      weeklyTitle: "周回顾", weeklyHint: "从本周真实记录（状态/日记/便签/互动/关怀）起草，预览确认后写入；无记录不生成。",
+      weeklyGenerate: "生成本周回顾", weeklyWritten: "周回顾已写入",
+      usageTitle: "模型用量", usageHint: "整理、日记、周回顾与规划的 token 消耗按来源累计，仅统计宿主返回的用量。",
+      usageEmpty: "还没有模型调用记录", usageCalls: "{count} 次", usageTokens: "{count} tokens", usageRecent: "最近明细",
       summaryMood: "此刻心情", summaryEnergy: "今日精力", summaryWarmth: "关系温度",
       openSection: "打开", summaryEmpty: "慢慢来，从一条记录开始。", viewAll: "查看全部",
 
@@ -185,6 +189,10 @@
       diaryEmpty: "No diary yet", diaryFromModel: "Model draft", diaryFromRule: "Rule draft", view: "View",
       planTitle: "Planning mode", planGenerate: "Draft plan", planPreviewed: "Plan preview ready", planApply: "Apply routine & cadence",
       planApplied: "Plan applied", planWeekend: "Weekend", planOrganizer: "Organizer cadence: ", planCare: "Suggested care time: ",
+      weeklyTitle: "Weekly review", weeklyHint: "Drafted from this week's real records (state/diary/notes/interactions/care) and written after confirmation; nothing is fabricated.",
+      weeklyGenerate: "Draft this week's review", weeklyWritten: "Weekly review written",
+      usageTitle: "Model usage", usageHint: "Token usage of organizer, diary, weekly and planning calls, aggregated per source; only counts usage reported by the provider.",
+      usageEmpty: "No model calls recorded yet", usageCalls: "{count} calls", usageTokens: "{count} tokens", usageRecent: "Recent",
       summaryMood: "Current mood", summaryEnergy: "Energy today", summaryWarmth: "Relationship warmth",
       openSection: "Open", summaryEmpty: "Start small. One record is enough.", viewAll: "View all",
 
@@ -404,6 +412,12 @@
     putDiarySettings: function (d) { return apiFetch("/companion-core/diary/settings", { method: "PUT", body: d }); },
     planPreview: function (d) { return apiFetch("/companion-core/plan/preview", { method: "POST", body: d }); },
     planApply: function (id) { return apiFetch("/companion-core/plan/apply", { method: "POST", body: { preview_id: id } }); },
+    listWeekly: function () { return apiFetch("/companion-core/weekly"); },
+    getWeekly: function (k) { return apiFetch("/companion-core/weekly/" + encodeURIComponent(k)); },
+    deleteWeekly: function (k) { return apiFetch("/companion-core/weekly/" + encodeURIComponent(k), { method: "DELETE" }); },
+    weeklyPreview: function (k) { return apiFetch("/companion-core/weekly/preview", { method: "POST", body: { week: k || "" } }); },
+    weeklyApply: function (id) { return apiFetch("/companion-core/weekly/apply", { method: "POST", body: { preview_id: id } }); },
+    usage: function () { return apiFetch("/companion-core/usage"); },
     listDreams: function () { return apiFetch("/companion-core/dreams"); },
     getDream: function (d) { return apiFetch("/companion-core/dreams/" + encodeURIComponent(d)); },
     createDream: function (d) { return apiFetch("/companion-core/dreams", { method: "POST", body: d }); },
@@ -723,6 +737,82 @@
 
   // ── Tab: Schedule ────────────────────────────────────────────────────
 
+  function WeeklyPanel(props) {
+    var t = props.t, C = props.C;
+    var ls = useAsync(api.listWeekly, []);
+    var _p = useState(null), preview = _p[0], setPreview = _p[1];
+    var _v = useState(null), viewing = _v[0], setViewing = _v[1];
+    var _b = useState(false), busy = _b[0], setBusy = _b[1];
+    function act(promise, okKey, after) {
+      if (busy) return;
+      setBusy(true);
+      promise.then(function (res) { message.success(t(okKey)); if (after) after(res); })
+        .catch(function (e) { message.error(t("saveFailed", { error: e.message })); })
+        .then(function () { setBusy(false); ls.retry(); });
+    }
+    if (ls.loading) return null;
+    var list = ls.data || [];
+    return h("div", { style: Object.assign({}, panelStyle(C), { padding: 12, marginTop: 16 }) },
+      h("strong", null, t("weeklyTitle")),
+      h("p", { style: { color: C.sub, fontSize: 12 } }, t("weeklyHint")),
+      h(Space, { wrap: true, style: { margin: "8px 0" } },
+        h(Button, { size: "small", disabled: busy, onClick: function () {
+            act(api.weeklyPreview(""), "diaryPreviewed", function (res) { setPreview(res); });
+          } }, t("weeklyGenerate"))),
+      preview ? h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+        h("strong", null, preview.week + " · " + (preview.source === "model" ? t("diaryFromModel") : t("diaryFromRule"))),
+        h("pre", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: "inherit", maxHeight: 260, overflow: "auto" } }, preview.text),
+        h(Space, {},
+          h(Button, { size: "small", type: "primary", disabled: busy, onClick: function () {
+              act(api.weeklyApply(preview.preview_id), "weeklyWritten", function () { setPreview(null); });
+            } }, t("diaryApply")),
+          h(Button, { size: "small", onClick: function () { setPreview(null); } }, t("cancel")))) : null,
+      viewing ? h("div", { style: { marginTop: 8 } },
+        h("strong", null, viewing.week),
+        h("pre", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontFamily: "inherit", maxHeight: 260, overflow: "auto" } }, viewing.content),
+        h(Space, { style: { marginTop: 6 } },
+          h(Popconfirm, { title: t("confirmDeleteSchedule"), onConfirm: function () {
+              act(api.deleteWeekly(viewing.week), "deleted", function () { setViewing(null); });
+            } }, h(Button, { size: "small", danger: true, disabled: busy }, t("delete"))),
+          h(Button, { size: "small", onClick: function () { setViewing(null); } }, t("cancel")))) : null,
+      list.length ? h("div", { style: { marginTop: 8 } }, list.map(function (item) {
+        return h("div", { key: item.week, style: { display: "flex", gap: 10, alignItems: "center", padding: "6px 0" } },
+          h("span", { style: { fontFamily: "monospace", color: C.accent } }, item.week),
+          h("span", { style: { flex: 1, color: C.sub, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, item.preview),
+          h(Button, { size: "small", type: "link", onClick: function () {
+              api.getWeekly(item.week).then(setViewing).catch(function (e) { message.error(e.message); });
+            } }, t("view")));
+      })) : null);
+  }
+
+  function UsagePanel(props) {
+    var t = props.t, C = props.C;
+    var s = useAsync(api.usage, []);
+    if (s.loading) return null;
+    if (s.error) return h("p", { style: { color: C.sub } }, s.error.message);
+    var data = s.data || {};
+    var totals = data.totals || {};
+    var keys = Object.keys(totals);
+    return h("div", { style: Object.assign({}, panelStyle(C), { padding: 12, marginTop: 16 }) },
+      h("strong", null, t("usageTitle")),
+      h("p", { style: { color: C.sub, fontSize: 12 } }, t("usageHint")),
+      keys.length === 0 ? h("p", { style: { color: C.sub } }, t("usageEmpty"))
+        : h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginTop: 8 } },
+            keys.map(function (k) {
+              return h("div", { key: k, style: { border: C.fieldBorder, borderRadius: 8, padding: 8 } },
+                h("strong", null, k),
+                h("p", { style: { margin: 0, color: C.sub, fontSize: 12 } },
+                  t("usageCalls", { count: totals[k].calls }) + " · " + t("usageTokens", { count: totals[k].total })));
+            })),
+      (data.recent || []).length ? h("details", { style: { marginTop: 8 } },
+        h("summary", null, t("usageRecent")),
+        h("div", { style: { maxHeight: 200, overflow: "auto", fontSize: 12, color: C.sub } },
+          data.recent.map(function (x, i) {
+            return h("p", { key: i, style: { margin: "2px 0", fontFamily: "monospace" } },
+              x.at + " · " + x.source + " · " + x.total + " tokens");
+          }))) : null);
+  }
+
   function DiaryTab(props) {
     var t = props.t, C = props.C;
     var ls = useAsync(api.listDiary, []);
@@ -783,7 +873,8 @@
                 h(Button, { size: "small", type: "link", onClick: function () {
                     api.getDiary(item.date).then(setViewing).catch(function (e) { message.error(e.message); });
                   } }, t("view")));
-            })));
+            })),
+      h(WeeklyPanel, { t: t, C: C }));
   }
 
   function PlanModal(props) {
@@ -1690,7 +1781,7 @@
             h(Popconfirm, {
               title: t("importConfirm"),
               onConfirm: function () { if (fileRef.current) fileRef.current.click(); },
-            }, h(Button, { danger: true, loading: importing, disabled: busy }, t("importData")))))));
+            }, h(Button, { danger: true, loading: importing, disabled: busy }, t("importData"))))), h(UsagePanel, { t: t, C: C })));
   }
 
   // ── Root ─────────────────────────────────────────────────────────────

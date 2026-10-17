@@ -35,6 +35,8 @@
   - /organizer/*                  聊天整理与文件回填（预览确认制）
   - GET/POST /diary 等             陪伴日记列表/预览/写入/删除与自动日记设置
   - POST     /plan/preview|apply   规划模式：模型起草作息+整理节奏+关怀建议（预览确认制）
+  - GET/POST /weekly 等            周回顾列表/预览/写入/删除（当周真实记录起草）
+  - GET      /usage               模型用量按来源汇总与最近明细
 
 智能体工具（@app.tool，tool_type=internal）：
   - companion_get_state          读取当前状态
@@ -344,7 +346,7 @@ def _seed_data() -> None:
     for path in [*(_DATA_DIR / "dreams").glob("*.md"),
                  *(_DATA_DIR / "history").glob("*.yaml"),
                  *(_DATA_DIR / "organizer-backups").glob("*.json"),
-                 *[_DATA_DIR / name for name in (*yaml_seeds, "routine.yaml", "notes.json", "setup.json", "organizer-settings.json", "organizer-status.json")]]:
+                 *[_DATA_DIR / name for name in (*yaml_seeds, "routine.yaml", "notes.json", "interactions.json", "usage.json", "setup.json", "organizer-settings.json", "organizer-status.json")]]:
         if path.is_file():
             path.chmod(0o600)
 
@@ -1091,7 +1093,83 @@ def _current_agent_id():
         return None
 
 
+_USAGE_PATH = _DATA_DIR / "usage.json"
+
+
+def _record_usage(source: str, usage: dict) -> None:
+    """Persist model token usage per source for transparency. Never raises."""
+    try:
+        if not isinstance(usage, dict):
+            return
+        total = usage.get("total_tokens")
+        if total is None:
+            total = int(usage.get("prompt_tokens", 0) or 0) + int(usage.get("completion_tokens", 0) or 0)
+        with _lock:
+            data = _read_json(_USAGE_PATH)
+            if not isinstance(data, list):
+                data = []
+            data.append({"at": _now_ts(), "source": source,
+                         "total": int(total or 0),
+                         "prompt": int(usage.get("prompt_tokens", 0) or 0),
+                         "completion": int(usage.get("completion_tokens", 0) or 0)})
+            if len(data) > 500:
+                del data[:-500]
+            _write_json(_USAGE_PATH, data)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+@router.get("/usage")
+def get_usage():
+    """模型用量透明化：按来源汇总 + 最近明细。"""
+    data = _read_json(_USAGE_PATH)
+    if not isinstance(data, list):
+        data = []
+    totals: dict = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        bucket = totals.setdefault(str(item.get("source", "unknown")),
+                                   {"calls": 0, "total": 0, "prompt": 0, "completion": 0})
+        bucket["calls"] += 1
+        bucket["total"] += int(item.get("total", 0) or 0)
+        bucket["prompt"] += int(item.get("prompt", 0) or 0)
+        bucket["completion"] += int(item.get("completion", 0) or 0)
+    return {"totals": totals, "recent": data[-20:][::-1]}
+
+
+_INTERACTIONS_PATH = _DATA_DIR / "interactions.json"
+
+
+def _log_interaction(kind: str, agent_id: str) -> None:
+    """Durable per-day interaction counters; scoring evidence for the
+    explainable warmth score. Never raises: logging must not break tools."""
+    try:
+        day = _today_str()
+        with _lock:
+            data = _read_json(_INTERACTIONS_PATH)
+            if not isinstance(data, list):
+                data = []
+            entry = next((x for x in data if isinstance(x, dict)
+                          and x.get("date") == day and x.get("kind") == kind), None)
+            if entry is None:
+                entry = {"date": day, "kind": kind, "count": 0, "agents": {}}
+                data.append(entry)
+            entry["count"] = int(entry.get("count", 0)) + 1
+            agents = entry.setdefault("agents", {})
+            agents[agent_id] = int(agents.get(agent_id, 0)) + 1
+            if len(data) > 400:
+                del data[:-400]
+            _write_json(_INTERACTIONS_PATH, data)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _record_tool_call(tool_name, status):
+    # 互动证据不依赖智能体归因：console 等场景可能取不到执行上下文，
+    # 但"今天有过成功工具互动"这一事实对计分仍然成立。
+    if status == "success":
+        _log_interaction("tool_call", _current_agent_id() or "unknown")
     agent_id = _current_agent_id()
     if not agent_id:
         return
@@ -1100,6 +1178,8 @@ def _record_tool_call(tool_name, status):
             _call_history.pop(next(iter(_call_history)))
         _call_history[agent_id] = {"tool": tool_name, "status": status,
                                    "at": _now_ts()}
+    if status == "success":
+        _log_interaction("tool_call", agent_id)
 
 
 # ── PawApp definition + lifecycle ────────────────────────────────────
@@ -1449,7 +1529,7 @@ def complete_setup(payload: SetupProfile):
 
 
 # Feature modules share the data lock and the host's existing lifecycle.
-for _feature_name in ("companion_features", "care", "life", "checkup", "diary", "plan"):
+for _feature_name in ("companion_features", "care", "life", "checkup", "diary", "plan", "weekly"):
     _spec = _importlib_util.spec_from_file_location("companion_"+_feature_name, _PLUGIN_DIR / (_feature_name+".py"))
     _module = _importlib_util.module_from_spec(_spec)
     _spec.loader.exec_module(_module)
