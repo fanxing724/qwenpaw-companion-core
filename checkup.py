@@ -87,7 +87,7 @@ def install(router, owner, life):
                     elif row["binding"] == "bound":
                         if skill["status"] == "conflict":
                             items.append(_item(f"agent:{agent_id}", f"智能体 {agent_id}", "warn",
-                                               f"工具已绑定，但技能文件与扩展自带版本不一致（{skill.get('reason', '')}）；"
+                                               f"工具已绑定，但技能未就绪：{skill.get('reason', skill['status'])}；"
                                                "一键修复会用扩展自带版本覆盖该副本",
                                                {"kind": "auto", "item": "update_skill", "agent_id": agent_id}))
                         else:
