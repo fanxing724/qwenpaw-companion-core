@@ -8,6 +8,9 @@
 from fastapi import Request
 from pydantic import BaseModel, Field
 
+import json
+import os
+
 
 class FixRequest(BaseModel):
     item: str = Field(min_length=1, max_length=50)
@@ -17,6 +20,18 @@ class FixRequest(BaseModel):
 def _item(item_id, label, status, detail, fix=None):
     return {"id": item_id, "label": label, "status": status,
             "detail": detail, "fix": fix or {"kind": "none"}}
+
+
+def _data_files(data_dir):
+    """陪伴数据文件清单（与启动时权限收紧范围一致）。"""
+    names = ["state.yaml", "schedule.yaml", "routine.yaml", "relationship.yaml",
+             "important_dates.yaml", "notes.json", "setup.json", "care-state.json",
+             "organizer-settings.json", "organizer-status.json"]
+    paths = [data_dir / n for n in names]
+    paths += sorted((data_dir / "dreams").glob("*.md")) if (data_dir / "dreams").is_dir() else []
+    paths += sorted((data_dir / "history").glob("*.yaml")) if (data_dir / "history").is_dir() else []
+    paths += sorted((data_dir / "organizer-backups").glob("*.json")) if (data_dir / "organizer-backups").is_dir() else []
+    return paths
 
 
 def install(router, owner, life):
@@ -103,6 +118,75 @@ def install(router, owner, life):
                                    {"kind": "ask_ai",
                                     "prompt": f"陪伴核心读取智能体配置失败：{exc}。请检查 QwenPaw 配置接口是否变化，告诉我结论。"}))
 
+        # 6.5 存储持久性（容器/宿主重置是否丢数据）
+        try:
+            real = str(data_dir.resolve())
+            best, fstype = "", ""
+            with open("/proc/mounts", encoding="utf-8") as fh:
+                for line in fh:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        mp = parts[1].rstrip("/") or "/"
+                        if (real == mp or real.startswith(mp + "/")) and len(mp) >= len(best):
+                            best, fstype = mp, parts[2]
+            if fstype in {"overlay", "tmpfs", "aufs", "squashfs"}:
+                items.append(_item("storage", "存储持久性", "warn",
+                                   f"数据目录位于易失文件系统（{fstype}）：容器或宿主重置会丢失陪伴数据",
+                                   {"kind": "ask_ai",
+                                    "prompt": f"陪伴核心数据目录 {real} 位于易失文件系统 {fstype}。请迁移到持久存储：暂停插件写入后完整复制该目录并保留权限，设置环境变量 QWENPAW_COMPANION_DATA 指向持久路径（或以符号链接回指），重启或重载后核对 /health 的 data_dir；验证通过前保留旧目录以便回退。"}))
+            else:
+                items.append(_item("storage", "存储持久性", "ok",
+                                   f"位于 {fstype or '未知'} 挂载（{best or '/'}），重置不丢"))
+        except OSError:
+            items.append(_item("storage", "存储持久性", "warn",
+                               "无法读取挂载信息，请自行确认数据目录位于持久存储",
+                               {"kind": "ask_ai",
+                                "prompt": "无法读取 /proc/mounts。请检查陪伴核心数据目录是否位于持久存储，必要时按 README 迁移。"}))
+
+        # 6.6 数据文件权限
+        loose = []
+        for path in _data_files(data_dir):
+            if path.exists() and not path.is_symlink() and path.stat().st_mode & 0o777 != 0o600:
+                loose.append(path.name)
+        if loose:
+            items.append(_item("permissions", "数据文件权限", "warn",
+                               f"以下文件不是 0600：{', '.join(loose)}",
+                               {"kind": "auto", "item": "tighten_permissions"}))
+        else:
+            items.append(_item("permissions", "数据文件权限", "ok", "陪伴数据文件均为 0600"))
+
+        # 6.7 关怀配置与合并关怀任务完整性
+        care = c.get("care")
+        if care is not None and c["app"] is not None:
+            enabled_agents = [k for k, v in care.read().get("settings", {}).items() if v.get("enabled")]
+            if not enabled_agents:
+                items.append(_item("care", "关怀任务", "warn",
+                                   "未启用（可选）：不会主动问候、便签提醒或纪念日提醒",
+                                   {"kind": "link", "target": "care"}))
+            else:
+                missing = []
+                for agent_id in enabled_agents:
+                    ws_dir = c["_workspace_dir"](agent_id)
+                    jobs_file = ws_dir / "jobs.json" if ws_dir else None
+                    present = False
+                    if jobs_file is not None and jobs_file.exists():
+                        try:
+                            doc = json.loads(jobs_file.read_text(encoding="utf-8"))
+                            present = any(j.get("id") == care.job_id(agent_id)
+                                          for j in doc.get("jobs", []))
+                        except (OSError, ValueError, TypeError):
+                            present = False
+                    if not present:
+                        missing.append(agent_id)
+                if missing:
+                    items.append(_item("care_job", "关怀定时任务", "warn",
+                                       f"已启用关怀但缺少合并关怀任务：{', '.join(missing)}",
+                                       {"kind": "auto", "item": "repair_care_job",
+                                        "agent_id": missing[0]}))
+                else:
+                    items.append(_item("care_job", "关怀定时任务", "ok",
+                                       f"{len(enabled_agents)} 个智能体的关怀任务在位"))
+
         # 6. 整理模型（可选，黄不红）
         settings = owner.read_json(c["_DATA_DIR"] / "organizer-settings.json", {})
         if isinstance(settings, dict) and settings.get("base_url") and settings.get("model"):
@@ -122,7 +206,7 @@ def install(router, owner, life):
         return {"items": items, "summary": counts}
 
     @router.post("/checkup/fix")
-    def post_fix(payload: FixRequest, request: Request):
+    async def post_fix(payload: FixRequest, request: Request):
         if payload.item == "enable_life":
             cfg = life.read()
             cfg["enabled"] = True
@@ -162,6 +246,23 @@ def install(router, owner, life):
                     "message": f"技能已更新为扩展自带版本：{payload.agent_id}"
                     if result["status"] == "updated" else result.get("reason", "技能未更新"),
                     "result": result}
+        if payload.item == "repair_care_job" and payload.agent_id:
+            care = c.get("care")
+            if care is None:
+                return {"fixed": False, "message": "关怀模块不可用"}
+            try:
+                result = await care.ensure_job(request, payload.agent_id)
+            except Exception as exc:  # noqa: BLE001
+                return {"fixed": False, "message": f"关怀任务重建失败：{exc}"}
+            return {"fixed": True, "message": f"已重建 {payload.agent_id} 的合并关怀任务",
+                    "result": result}
+        if payload.item == "tighten_permissions":
+            fixed = []
+            for path in _data_files(c["_DATA_DIR"]):
+                if path.exists() and not path.is_symlink():
+                    os.chmod(path, 0o600)
+                    fixed.append(path.name)
+            return {"fixed": True, "message": f"已将 {len(fixed)} 个数据文件收紧为 0600"}
         return {"fixed": False, "message": "该项不支持一键修复"}
 
     return get_checkup

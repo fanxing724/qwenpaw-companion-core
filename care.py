@@ -168,13 +168,7 @@ class Care:
             if not cfg['user_id'] or not cfg['session_id'] or not any(all(x[k]==cfg[k] for k in ('channel','user_id','session_id')) for x in targets):
                 raise HTTPException(400,'请选择该智能体已有会话中的投递目标')
             try:
-                from qwenpaw.app.crons.models import CronJobSpec
-                spec=CronJobSpec.model_validate({'id':job_id,'name':'陪伴核心：合并关怀','enabled':True,
-                    'schedule':{'type':'cron','cron':'*/5 * * * *','timezone':self.c['_TIMEZONE_NAME']},
-                    'task_type':'agent','request':{'input':[], 'companion_care_token':cfg['token']},
-                    'dispatch':{'channel':cfg['channel'],'target':{'user_id':cfg['user_id'],'session_id':cfg['session_id']},'silent':True,'mode':'final'},
-                    'runtime':{'max_concurrency':1,'timeout_seconds':90,'misfire_grace_seconds':600,'share_session':False,'tool_safety':True},
-                    'meta':{'owner':'companion-core','agent_id':payload.agent_id}})
+                spec=self.job_spec(cfg,payload.agent_id)
                 existing=await manager.get_job(job_id)
                 if existing and getattr(existing,'meta',{}).get('owner')!='companion-core':raise HTTPException(409,'任务 ID 已被其他任务使用')
                 # Write durable opt-in settings before registration; roll back on host failure.
@@ -194,6 +188,29 @@ class Care:
                 data=self.read();data.setdefault('settings',{})[payload.agent_id]=cfg;self.write(data)
         self.pending.pop(payload.review_id,None)
         return await self.view(request,payload.agent_id)
+
+    def job_spec(self,cfg,agent_id):
+        """Build the merged care cron job spec from durable settings."""
+        from qwenpaw.app.crons.models import CronJobSpec
+        return CronJobSpec.model_validate({'id':self.job_id(agent_id),'name':'陪伴核心：合并关怀','enabled':True,
+            'schedule':{'type':'cron','cron':'*/5 * * * *','timezone':self.c['_TIMEZONE_NAME']},
+            'task_type':'agent','request':{'input':[], 'companion_care_token':cfg.get('token') or ''},
+            'dispatch':{'channel':cfg['channel'],'target':{'user_id':cfg['user_id'],'session_id':cfg['session_id']},'silent':True,'mode':'final'},
+            'runtime':{'max_concurrency':1,'timeout_seconds':90,'misfire_grace_seconds':600,'share_session':False,'tool_safety':True},
+            'meta':{'owner':'companion-core','agent_id':agent_id}})
+
+    async def ensure_job(self,request,agent_id):
+        """Repair path: re-register the merged care job from saved settings."""
+        cfg=self.settings(agent_id)
+        if not cfg.get('enabled'):raise HTTPException(400,'该智能体未启用关怀，无需修复任务')
+        ws=await self.o.workspace(request,agent_id)
+        manager=getattr(ws,'cron_manager',None)
+        if not self.scheduling_supported(manager):raise HTTPException(503,'宿主未提供兼容的公开 CronManager 接口')
+        spec=self.job_spec(cfg,agent_id)
+        existing=await manager.get_job(spec.id)
+        if existing and getattr(existing,'meta',{}).get('owner')!='companion-core':raise HTTPException(409,'任务 ID 已被其他任务使用')
+        await manager.create_or_replace_job(spec)
+        return {'state':'registered','job_id':spec.id}
 
     def model_plan(self,cfg,batch):
         try:

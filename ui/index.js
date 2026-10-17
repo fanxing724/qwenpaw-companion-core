@@ -102,7 +102,7 @@
       lifeEvolvedAt: "最近演化", lifeAutoFields: "自动管理的字段", lifeNoSchedule: "填写今日日程后才会演化，不编造状态。",
       tabCheckup: "检查", checkupHint: "自动体检安装与配置状态；能自动修复的可一键修复。",
       checkupOk: "正常", checkupWarn: "建议处理", checkupError: "需要修复",
-      checkupFix: "一键修复", checkupAskAi: "发给 Agent 修复", checkupGoto: "去设置",
+      checkupFix: "一键修复", checkupFixAll: "一键修复全部", checkupFixAllDone: "已修复 {done} 项，失败 {failed} 项", checkupNothingToFix: "没有可自动修复的项目", checkupAskAi: "发给 Agent 修复", checkupGoto: "去设置",
       checkupFixed: "已修复", checkupFixFailed: "修复失败: {error}", checkupCopied: "修复指令已复制，粘贴到 Agent 聊天中即可",
       noState: "还没有状态数据", noPlan: "今天还没有安排", noDreams: "还没有梦境记录",
       dreamOf: "{date} 的梦", newDream: "写梦",
@@ -189,7 +189,7 @@
       lifeEvolvedAt: "Last evolved", lifeAutoFields: "Auto-managed fields", lifeNoSchedule: "Evolution needs today's schedule; nothing is fabricated.",
       tabCheckup: "Checkup", checkupHint: "Inspects installation and configuration; auto-fixable items can be repaired in one click.",
       checkupOk: "OK", checkupWarn: "Suggested", checkupError: "Action needed",
-      checkupFix: "Fix now", checkupAskAi: "Send to Agent", checkupGoto: "Open settings",
+      checkupFix: "Fix now", checkupFixAll: "Fix all", checkupFixAllDone: "Fixed {done}, failed {failed}", checkupNothingToFix: "Nothing to auto-fix", checkupAskAi: "Send to Agent", checkupGoto: "Open settings",
       checkupFixed: "Fixed", checkupFixFailed: "Fix failed: {error}", checkupCopied: "Repair instruction copied; paste it into the Agent chat",
       noState: "No state data yet", noPlan: "Nothing planned yet", noDreams: "No dreams recorded yet",
       dreamOf: "Dream of {date}", newDream: "New Dream",
@@ -637,6 +637,27 @@
         .then(function () { setFixing(""); });
     }
 
+    function fixAll() {
+      if (fixing) return;
+      var targets = data.items.filter(function (it) { return it.fix && it.fix.kind === "auto"; });
+      if (!targets.length) { message.info(t("checkupNothingToFix")); return; }
+      setFixing("all");
+      var done = 0, failed = 0;
+      var chain = Promise.resolve();
+      targets.forEach(function (it) {
+        chain = chain.then(function () {
+          return api.fixCheckup({ item: it.fix.item, agent_id: it.fix.agent_id || "" })
+            .then(function (res) { if (res && res.fixed) done++; else failed++; })
+            .catch(function () { failed++; });
+        });
+      });
+      chain.then(function () {
+        setFixing("");
+        message.success(t("checkupFixAllDone", { done: done, failed: failed }));
+        s.retry();
+      });
+    }
+
     function askAi(item) {
       var text = item.fix.prompt || item.detail;
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -649,7 +670,9 @@
     return h("div", null,
       h(Toolbar, {
         left: h("span", { style: { color: C.sub, fontSize: 13 } }, t("checkupHint")),
-        right: h(Button, { size: "small", onClick: s.retry }, t("refresh")),
+        right: h(Space, { size: 8 },
+          h(Button, { size: "small", type: "primary", loading: fixing === "all", onClick: fixAll }, t("checkupFixAll")),
+          h(Button, { size: "small", onClick: s.retry }, t("refresh"))),
       }),
       h("div", { style: { display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" } },
         ["ok", "warn", "error"].map(function (key) {
