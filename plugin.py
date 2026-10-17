@@ -1447,7 +1447,7 @@ def complete_setup(payload: SetupProfile):
 
 
 # Feature modules share the data lock and the host's existing lifecycle.
-for _feature_name in ("companion_features", "care", "life", "checkup"):
+for _feature_name in ("companion_features", "care", "life", "checkup", "diary"):
     _spec = _importlib_util.spec_from_file_location("companion_"+_feature_name, _PLUGIN_DIR / (_feature_name+".py"))
     _module = _importlib_util.module_from_spec(_spec)
     _spec.loader.exec_module(_module)
@@ -1457,8 +1457,10 @@ for _feature_name in ("companion_features", "care", "life", "checkup"):
         care = _module.install(router, organizer, features)
     elif _feature_name == "life":
         life = _module.install(router, organizer)
-    else:
+    elif _feature_name == "checkup":
         checkup = _module.install(router, organizer, life)
+    else:
+        diary = _module.install(router, organizer, life)
 
 # Standard router loaders do not invoke PawApp lifecycle hooks, even
 # when the optional SDK is installed. Initialize only missing files.

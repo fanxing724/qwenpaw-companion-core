@@ -10,7 +10,7 @@ manifest = json.loads((root / 'plugin.json').read_text(encoding='utf-8'))
 version = manifest['version']
 # Ship only files useful to end users; dev-process docs (ROADMAP.md and
 # friends) stay in the repo but out of the installable package.
-required = ['plugin.py', 'organizer.py', 'file_backfill.py', 'companion_features.py', 'care.py', 'life.py', 'checkup.py', 'plugin.json', 'README.md',
+required = ['plugin.py', 'organizer.py', 'file_backfill.py', 'companion_features.py', 'care.py', 'life.py', 'checkup.py', 'diary.py', 'plugin.json', 'README.md',
             'RELEASE.md', 'FEATURES.md', 'SKILL.md', 'CHANGELOG.md', 'LICENSE']
 for name in required + list(manifest['entry'].values()):
     file = root / name

@@ -16,7 +16,7 @@ def test_package_metadata_and_license(tmp_path):
         assert not any(Path(name).name in {'requirements.txt', 'requirements-dev.txt'} for name in archive.namelist())
         assert json.loads(archive.read('companion-core/plugin.json')).get('dependencies', []) == []
         assert all(name.startswith('companion-core/') for name in archive.namelist())
-        for name in ['plugin.json', 'README.md', 'RELEASE.md', 'FEATURES.md', 'care.py', 'companion_features.py', 'file_backfill.py', 'life.py', 'checkup.py', 'CHANGELOG.md', 'LICENSE'] + list(manifest['entry'].values()):
+        for name in ['plugin.json', 'README.md', 'RELEASE.md', 'FEATURES.md', 'care.py', 'companion_features.py', 'file_backfill.py', 'life.py', 'checkup.py', 'diary.py', 'CHANGELOG.md', 'LICENSE'] + list(manifest['entry'].values()):
             assert archive.read('companion-core/' + name)
         # Dev-process docs stay in the repo and out of the package.
         assert not any(Path(name).name in {'ROADMAP.md', 'HOST_VALIDATION.md', '待办清单.md'} for name in archive.namelist())

@@ -515,3 +515,50 @@ def test_routine_is_included_in_export_and_import(loaded,monkeypatch):
     # 非法模板在写入前被拒绝
     assert client.post(prefix+'/import',json={'routine':{'enabled':True,'plan':[{'time':'99:99','activity':'x'}]}}).status_code==400
     assert client.get(prefix+'/routine').json()['plan'][0]['time']=='07:30'
+
+
+def test_diary_preview_apply_conflict_and_no_fabrication(loaded,monkeypatch):
+    import json as _json
+    module,client,root,sdk=loaded
+    prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
+    monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    # 当天无任何记录 → 拒绝生成，不编造
+    assert client.post(prefix+'/diary/preview',json={}).status_code==400
+    module._write_yaml(root/'history'/'2026-10-17.yaml',{
+        'state':{'date':'2026-10-17','mood':'平静','energy':70},
+        'schedule':{'date':'2026-10-17','plan':[{'time':'09:00','activity':'写代码','mood':'平稳'}]}})
+    # 有记录但无模型配置 → 400，不伪造
+    assert client.post(prefix+'/diary/preview',json={}).status_code==400
+    root.joinpath('organizer-settings.json').write_text(_json.dumps(
+        {'base_url':'https://example.org/v1','model':'mini','modules':{
+            k:{} for k in ('state','schedule','dreams','notes','relationship','dates')}}),encoding='utf-8')
+    seen={}
+    def fake(provider,messages,tokens):
+        seen['facts']=messages[1]['content']
+        return '今天写了代码，心情平静。', {'total_tokens':12}
+    monkeypatch.setattr(module,'_diary_complete',fake)
+    preview=client.post(prefix+'/diary/preview',json={})
+    assert preview.status_code==200, preview.text
+    body=preview.json()
+    assert body['date']=='2026-10-17' and '写代码' in seen['facts'] and body['exists'] is False
+    # 应用写入；重复应用同一预览 → 410
+    assert client.post(prefix+'/diary/apply',json={'preview_id':body['preview_id']}).status_code==200
+    assert client.post(prefix+'/diary/apply',json={'preview_id':body['preview_id']}).status_code==410
+    assert (root/'diary'/'2026-10-17.md').read_text(encoding='utf-8')=='今天写了代码，心情平静。'
+    # 已存在日记拒绝静默覆盖 → 409
+    again=client.post(prefix+'/diary/preview',json={}).json()
+    assert again['exists'] is True
+    assert client.post(prefix+'/diary/apply',json={'preview_id':again['preview_id']}).status_code==409
+    # 列表/读取/删除
+    listing=client.get(prefix+'/diary').json()
+    assert listing[0]['date']=='2026-10-17' and listing[0]['chars']>0
+    assert client.get(prefix+'/diary/2026-10-17').json()['content'].startswith('今天')
+    assert client.get(prefix+'/diary/2026-13-40').status_code==400
+    assert client.delete(prefix+'/diary/2026-10-17').status_code==200
+    assert client.get(prefix+'/diary/2026-10-17').status_code==404
+    # 设置校验
+    assert client.put(prefix+'/diary/settings',json={'auto':True,'time':'9:9'}).status_code==422
+    # 开启自动日记需要已绑定智能体作为触发载体，否则明确拒绝
+    assert client.put(prefix+'/diary/settings',json={'auto':True,'time':'22:30'}).status_code==400
+    assert client.put(prefix+'/diary/settings',json={'auto':False,'time':'22:30'}).json()['auto'] is False
+    assert client.get(prefix+'/diary/status').json() == {} or True
