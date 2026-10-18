@@ -30,6 +30,10 @@
 
 - 多智能体数据隔离：profiles.json 映射智能体到数据档案（shared 或 profiles/<id>/ 独立目录，自动种子化）；HTTP（agent 查询参数，前端自动附带）、Agent 工具（执行上下文）、关怀/日记钩子（ctx.agent_id）三条路径统一解析，无上下文回退 shared；档案名校验拒绝路径穿越；切换不迁移数据（导出/导入搬迁）；绑定页新增档案选择器（共用/独立/自定义组）。
 
+# v2.14.1
+
+- 修复 GET /backup 在数据目录为符号链接时 500：_record_files 追加的 profiles.json 为未解析路径，collect() 相对化失败；现相对化前先 resolve。新增"符号链接数据目录"回归测试。该布局正是 README 推荐的持久化姿势，影响所有 symlink/NAS 挂载部署。
+
 # 未发布
 
 - 描述文件全面刷新：plugin.json 描述与中英 i18n、FEATURES.md（新增生活引擎/作息、检查页修复、导航与反馈三节）、SKILL.md（Agent 指引：自动维护字段只读引用、尊重空白日、配置问题引导检查页）、README 与 SKILL 的 REST API 表补齐 /life、/routine、/checkup、/care、/agents 等端点、plugin.py 头部端点清单同步；ROADMAP 与 DESIGN 文档状态刷新并清除已删除文件的死链。
