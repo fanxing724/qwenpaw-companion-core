@@ -1,3 +1,7 @@
+# v2.14.4
+
+- 文档：README 署名保留分工——番星 与 GPT（设计与初始框架源码）、QwenPaw（使用 kimi-k3 和 qwen3.8max，负责测试与优化）联合制作。
+
 # v2.14.3
 
 - 文档：README 署名更新为「番星 与 QwenPaw（使用 kimi-k3 和 qwen3.8max 开发）」。
