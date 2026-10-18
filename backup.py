@@ -125,7 +125,7 @@ def install(router, owner, life):
                 if any(p.is_symlink() for p in (directory/folder).glob(pattern)):
                     raise HTTPException(409,'备份记录不可为符号链接')
             for path in c['_record_files'](directory):
-                relative=path.relative_to(base).as_posix()
+                relative=path.resolve().relative_to(base).as_posix()
                 try:safe_path(relative)
                 except ValueError as exc:raise HTTPException(409,str(exc)) from None
                 if path.stat().st_size>2*1024*1024:raise HTTPException(400,'单文件超过备份上限 2 MiB')

@@ -686,3 +686,25 @@ def test_profiles_isolate_data_per_agent(loaded,monkeypatch):
         assert module._read_yaml(module._DATA_DIR/'state.yaml')['mood']=='共享'
     finally:
         module._PROFILE_CTX.reset(token)
+
+
+def test_backup_works_when_data_dir_is_symlink(tmp_path,monkeypatch):
+    import importlib.util
+    import sys as _sys
+    import types as _t
+    from pathlib import Path
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    real=tmp_path/'real'; real.mkdir()
+    link=tmp_path/'link'; link.symlink_to(real)
+    monkeypatch.setenv('QWENPAW_COMPANION_DATA',str(link))
+    host=_t.ModuleType('qwenpaw'); host.__path__=[]
+    monkeypatch.setitem(_sys.modules,'qwenpaw',host)
+    monkeypatch.delitem(_sys.modules,'qwenpaw.pawapp',raising=False)
+    spec=importlib.util.spec_from_file_location('plug_sym', Path(__file__).resolve().parents[1]/'plugin.py')
+    mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    app=FastAPI(); app.include_router(mod.router)
+    client=TestClient(app)
+    response=client.get('/backup')
+    assert response.status_code==200, response.text
+    assert 'profiles.json' not in response.json()['files'] or response.json()['files']
