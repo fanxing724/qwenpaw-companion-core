@@ -12,7 +12,7 @@ from pathlib import Path
 import threading
 import time
 from urllib.parse import urlsplit
-from urllib.request import Request as URLRequest, build_opener, HTTPRedirectHandler
+from urllib.request import Request as URLRequest, build_opener, HTTPRedirectHandler, ProxyHandler
 from urllib.error import HTTPError
 from uuid import uuid4
 
@@ -267,13 +267,18 @@ class ChatOrganizer:
         payload = {'model':model, 'messages':messages, 'max_tokens':tokens, 'stream':False}
         request = URLRequest(endpoint, data=json.dumps(payload).encode(), headers=headers, method='POST')
         try:
-            with build_opener(NoRedirect).open(request, timeout=60) as response:
+            # 直连模型端点：透明代理环境下（如容器出口代理）urllib 默认走代理
+            # 会被网关 426 拦截；空 ProxyHandler 强制直连。
+            with build_opener(NoRedirect, ProxyHandler({})).open(request, timeout=60) as response:
                 raw = response.read(1024 * 1024 + 1)
             if len(raw) > 1024 * 1024:
                 raise ValueError('response too large')
             result = json.loads(raw)
-            if result['choices'][0].get('finish_reason') in {'length', 'content_filter'}:
-                raise ValueError('incomplete model response')
+            finish_reason = result['choices'][0].get('finish_reason')
+            if finish_reason == 'content_filter':
+                raise HTTPException(422, '该会话内容未通过模型的内容安全审核，已跳过整理；未写入数据')
+            if finish_reason == 'length':
+                raise HTTPException(422, '模型输出达到 token 上限被截断，请调大 max_output_tokens 或减少上下文；未写入数据')
             content = result['choices'][0]['message']['content']
             if content.startswith('```'):
                 content = '\n'.join(content.splitlines()[1:-1])
@@ -282,6 +287,8 @@ class ChatOrganizer:
                 raise ValueError('invalid response envelope')
             usage = result.get('usage', {})
             return result_json['changes'], usage
+        except HTTPException:
+            raise
         except HTTPError as exc:
             raise HTTPException(502, f'模型接口返回 HTTP {exc.code}，请检查 API、模型或额度') from None
         except Exception:
@@ -294,8 +301,12 @@ class ChatOrganizer:
             return None
         if key in {'state', 'schedule', 'relationship'}:
             model = {'state':c['StateModel'], 'schedule':c['ScheduleModel'], 'relationship':c['RelationshipModel']}[key]
-            if not isinstance(changes, dict) or set(changes) - set(model.model_fields):
-                raise ValueError('未知字段或数据类型错误')
+            if not isinstance(changes, dict):
+                raise ValueError('数据类型错误')
+            # 宽容处理：忽略模型输出的未知字段（模型常会附带 last_updated 等合理字段）
+            changes = {k: v for k, v in changes.items() if k in model.model_fields}
+            if not changes:
+                return None
             if key == 'relationship' and 'milestones' in changes:
                 if not isinstance(changes['milestones'], list) or len(changes['milestones']) > 50:
                     raise ValueError('里程碑格式错误或过多')
@@ -322,9 +333,10 @@ class ChatOrganizer:
         records = deepcopy(before)
         identity = {'notes':'id', 'dreams':'date', 'dates':'name'}[key]
         for item in changes:
-            if not isinstance(item, dict) or set(item) - set(model.model_fields):
-                raise ValueError('未知字段或格式错误')
-            item = dict(item)
+            if not isinstance(item, dict):
+                raise ValueError('数据类型错误')
+            # 宽容处理：忽略未知字段
+            item = {k: v for k, v in item.items() if k in model.model_fields}
             if key=='dates' and isinstance(item.get('name'),str):item['name']=item['name'].strip()
             if key == 'notes' and not item.get('id'):
                 if any(note['content'] == item.get('content') for note in records):
