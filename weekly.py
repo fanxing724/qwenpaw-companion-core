@@ -2,8 +2,12 @@
 """Weekly review: model-drafted (or rule-summarized) from that week's records.
 
 与日记同一安全姿态：只从当周真实记录起草（history 快照、日记、便签、互动与
-关怀投递计数）；无记录或无模型时给规则摘要并明确标注来源；预览确认后才写入；
+关怀投递计数）；无记录拒绝生成，无模型时给规则摘要并明确标注来源；预览确认后才写入；
 已存在的周回顾拒绝覆盖；删除需显式调用。
+
+
+AI 陪伴档案的一周回顾层，汇总当前档案记录，不汇总用户的个人生活。
+回顾写入 weekly/ 并不代表已注入主对话上下文；见 DESIGN.md。
 """
 import re
 import threading
@@ -139,7 +143,7 @@ def install(router, owner, life):
         else:
             messages = [
                 {"role": "system", "content":
-                 "你是陪伴角色本人。只依据用户提供的一周记录写第一人称周回顾，"
+                 "你以当前 AI 陪伴角色的第一人称，依据其一周状态与陪伴记录写 AI 周回顾。严格区分 AI 与用户的经历，用户自述不得写成 AI 的经历。"
                  f"不超过{MAX_CHARS}字；没有的事实一律不写；直接输出正文，不要 JSON、不要代码块。"},
                 {"role": "user", "content": f"周：{key}\n记录：\n" + "\n".join(facts)},
             ]
@@ -152,17 +156,19 @@ def install(router, owner, life):
         if not text or len(text) > MAX_CHARS:
             raise HTTPException(502, "模型返回为空或超长，已拒绝")
         with lock:
-            pid = owner.backfill.store(pending, {"week": key, "text": text})
+            pid = owner.backfill.store(pending, {"week": key, "text": text, "facts": facts})
         return {"preview_id": pid, "week": key, "source": source, "text": text,
                 "facts": facts, "expires_in_seconds": 600,
                 "exists": (weekly_dir / f"{key}.md").is_file()}
 
     @router.post("/weekly/apply")
     def apply_weekly(payload: WeekApply):
-        with lock:
+        with lock, c["_lock"]:
             entry = owner.backfill.get(pending, payload.preview_id)
             if not entry:
                 raise HTTPException(410, "预览已过期或不存在，请重新生成")
+            if week_facts(entry['week']) != entry['facts']:
+                raise HTTPException(409, "周回顾预览后来源记录已变化，请重新生成")
             weekly_dir.mkdir(parents=True, exist_ok=True)
             path = weekly_dir / f"{entry['week']}.md"
             if path.is_symlink():

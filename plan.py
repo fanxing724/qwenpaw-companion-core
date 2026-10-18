@@ -4,6 +4,10 @@
 预览确认制：模型结果先校验再入 pending，应用时才写盘。作息与整理节奏可直接
 写入；关怀只返回预填建议（必须走关怀自身的预览-确认流），不静默开启主动消息。
 无模型配置时只返回规则生成的作息草稿（不经模型），其余明确标为不可用。
+
+
+AI 工作台的作息草案与自动整理节奏规划层；用户偏好约束 AI 的安排。
+作息计划不是已经发生的经历，关怀建议仍由 care 流程确认，见 DESIGN.md。
 """
 import re
 import threading
@@ -54,6 +58,9 @@ def install(router, owner, life):
         if not isinstance(routine, list) or not routine:
             raise ValueError("routine 必须是非空列表")
         plan = c["ScheduleModel"](plan=routine).plan
+        times = [item.time for item in plan]
+        if times != sorted(set(times)):
+            raise ValueError("作息时间须严格递增且不重复")
         organizer = raw.get("organizer") or {}
         interval = int(organizer.get("interval_minutes", 30))
         if not 30 <= interval <= 720:
@@ -69,8 +76,13 @@ def install(router, owner, life):
                               "interval_minutes": interval},
                 "care": care}
 
+    def input_snapshot():
+        return {"routine":c["_read_yaml"](c["_DATA_DIR"] / "routine.yaml") or {},
+                "organizer":c["_organizer_module"].fingerprint(owner.settings().model_dump())}
+
     @router.post("/plan/preview")
     def plan_preview(payload: PlanRequest):
+        before = input_snapshot()
         context = []
         routine_now = c["_read_yaml"](c["_DATA_DIR"] / "routine.yaml") or {}
         if routine_now.get("plan"):
@@ -93,13 +105,13 @@ def install(router, owner, life):
                      "organizer": {"auto_enabled": False, "interval_minutes": 30},
                      "care": {"time": "08:15", "quiet_start": "23:00", "quiet_end": "08:00"}}
             with lock:
-                key = owner.backfill.store(pending, {"plan": draft})
+                key = owner.backfill.store(pending, {"plan": draft, "before":before})
             return {"preview_id": key, "source": "rule", "model_available": False,
                     "plan": draft, "expires_in_seconds": 600,
                     "notice": "未配置模型：仅生成规则作息草稿，整理节奏与关怀建议需手动配置"}
         messages = [
             {"role": "system", "content":
-             "你是陪伴系统规划器。输出 JSON：{\"changes\": {\"routine\": [{\"time\":\"HH:MM\","
+             "你为当前 AI 陪伴角色规划它自己的作息与活动，用户偏好仅用于约束 AI 的作息与关怀时机。输出 JSON：{\"changes\": {\"routine\": [{\"time\":\"HH:MM\","
              "\"activity\":\"...\",\"mood\":\"平稳\"}], \"organizer\": {\"auto_enabled\": bool,"
              " \"interval_minutes\": int}, \"care\": {\"time\":\"HH:MM\",\"quiet_start\":\"HH:MM\","
              "\"quiet_end\":\"HH:MM\"}}}。routine 6-10 条、时间递增；关怀时间必须避开静默时段；"
@@ -117,17 +129,19 @@ def install(router, owner, life):
         except (ValueError, TypeError, KeyError) as exc:
             raise HTTPException(502, f"模型规划结果无效：{exc}") from None
         with lock:
-            key = owner.backfill.store(pending, {"plan": plan, "usage": usage})
+            key = owner.backfill.store(pending, {"plan": plan, "usage": usage, "before":before})
         return {"preview_id": key, "source": "model", "model_available": True,
                 "plan": plan, "usage": usage, "expires_in_seconds": 600}
 
     @router.post("/plan/apply")
     def plan_apply(payload: PlanApply):
         preview_id = payload.preview_id
-        with lock:
+        with lock, c["_lock"]:
             entry = owner.backfill.get(pending, preview_id)
             if not entry:
                 raise HTTPException(410, "预览已过期或不存在，请重新生成")
+            if input_snapshot() != entry["before"]:
+                raise HTTPException(409, "规划预览后作息或整理设置已变化，请重新生成")
             plan = entry["plan"]
             c["_write_yaml"](c["_DATA_DIR"] / "routine.yaml",
                              {"enabled": True, "plan": plan["routine"]})
@@ -139,6 +153,7 @@ def install(router, owner, life):
                 validated = c["_organizer_module"].OrganizerSettings.model_validate(raw)
                 owner.private_write(owner.path, validated.model_dump())
                 written.append("organizer")
+            pending.pop(preview_id, None)
         return {"written": written,
                 "care_suggestion": plan["care"],
                 "notice": "关怀设置未自动写入：请到关怀页预览并确认后启用（防打扰与投递目标需本人确认）"}

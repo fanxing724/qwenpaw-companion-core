@@ -4,6 +4,10 @@
 检查只做只读探测（数据目录可写性用临时文件验证后立即删除）；
 修复动作仅限扩展能力范围内（绑定智能体、安装技能、开启生活引擎），
 且都复用与界面手动操作相同的代码路径，不做静默越权修改。
+
+
+AI 工作台的安装、绑定和配置诊断层，不能用检查通过代替 AI 实际读写验收。
+检查入口含临时写盘探针，修复入口会修改配置；具体边界见 DESIGN.md 和 FILE_REVIEW.md。
 """
 from fastapi import Request
 from pydantic import BaseModel, Field
@@ -22,16 +26,6 @@ def _item(item_id, label, status, detail, fix=None):
             "detail": detail, "fix": fix or {"kind": "none"}}
 
 
-def _data_files(data_dir):
-    """陪伴数据文件清单（与启动时权限收紧范围一致）。"""
-    names = ["state.yaml", "schedule.yaml", "routine.yaml", "relationship.yaml",
-             "important_dates.yaml", "notes.json", "interactions.json", "setup.json", "care-state.json",
-             "organizer-settings.json", "organizer-status.json"]
-    paths = [data_dir / n for n in names]
-    paths += sorted((data_dir / "dreams").glob("*.md")) if (data_dir / "dreams").is_dir() else []
-    paths += sorted((data_dir / "history").glob("*.yaml")) if (data_dir / "history").is_dir() else []
-    paths += sorted((data_dir / "organizer-backups").glob("*.json")) if (data_dir / "organizer-backups").is_dir() else []
-    return paths
 
 
 def install(router, owner, life):
@@ -149,7 +143,7 @@ def install(router, owner, life):
 
         # 6.6 数据文件权限
         loose = []
-        for path in _data_files(data_dir):
+        for path in c["_record_files"](data_dir):
             if path.exists() and not path.is_symlink() and path.stat().st_mode & 0o777 != 0o600:
                 loose.append(path.name)
         if loose:
@@ -262,7 +256,7 @@ def install(router, owner, life):
                     "result": result}
         if payload.item == "tighten_permissions":
             fixed = []
-            for path in _data_files(c["_DATA_DIR"]):
+            for path in c["_record_files"](c["_DATA_DIR"]):
                 if path.exists() and not path.is_symlink():
                     os.chmod(path, 0o600)
                     fixed.append(path.name)

@@ -1,4 +1,8 @@
-"""Read-only timeline, host-model discovery and explicitly reviewed local insights."""
+"""Read-only timeline, host-model discovery and explicitly reviewed local insights.
+
+AI 陪伴经历的回看与关系线索层。timeline 优先返回插件 diary/，同时保留宿主 memory/YYYY-MM-DD.md 的正文与来源。
+两种来源不互相覆盖，设计与修复记录见 DESIGN.md 和 FILE_REVIEW.md。
+"""
 from datetime import date
 import hashlib
 import json
@@ -50,7 +54,9 @@ class Features:
         root=Path(ws.workspace_dir).expanduser().resolve()
         day=self.day(day or self.c['_today_str']())
         diary_days=self.memory_index(root)
-        diary,note=self.sources.read(root,'memory/'+day+'.md')
+        host_diary,note=self.sources.read(root,'memory/'+day+'.md')
+        companion_diary,companion_note=self.sources.read(self.c['_DATA_DIR'],'diary/'+day+'.md')
+        diary=companion_diary or host_diary
         with self.c['_lock']:
             archive_path=self.c['_DATA_DIR']/'history'/f'{day}.yaml'
             archived={} if archive_path.is_symlink() or archive_path.parent.is_symlink() else self.c['_read_yaml'](archive_path)
@@ -68,7 +74,7 @@ class Features:
             except (KeyError,ValueError,TypeError):continue
             if delta<=30:countdown.append({**item,'days_until':delta})
         available=set(diary_days)
-        for directory,suffix in [('history','.yaml'),('dreams','.md')]:
+        for directory,suffix in [('history','.yaml'),('dreams','.md'),('diary','.md')]:
             parent=self.c['_DATA_DIR']/directory
             if parent.is_symlink() or not parent.exists():continue
             for i,path in enumerate(parent.iterdir()):
@@ -80,12 +86,14 @@ class Features:
         for item in (state,schedule):
             if item.get('date'):available.add(item['date'])
         return {'agent_id':agent_id,'date':day,'diary':diary or '',
-                'diary_notice':('该智能体暂无该日期的本地日记；远程记忆暂不支持' if diary is None else ''),
+                'diary_notice':('该日期暂无插件日记或宿主本地日记；远程记忆暂不支持' if not diary else ''),
+                'diary_source':'companion' if companion_diary else 'host' if host_diary else None,
+                'companion_diary':companion_diary or '', 'host_diary':host_diary or '',
                 'dream':dream or '',**historical,'countdown':countdown,
                 'dates':sorted(available,reverse=True)[:1000],
-                'on_this_day':[x for x in diary_days if x[5:]==day[5:] and x[:4]<day[:4]],
+                'on_this_day':[x for x in sorted(set(diary_days)|{p.stem for p in (self.c['_DATA_DIR']/'diary').glob('*.md') if not p.is_symlink() and not p.parent.is_symlink()},reverse=True) if x[5:]==day[5:] and x[:4]<day[:4]],
                 'milestones':relation.get('milestones',[]),
-                'shared_data_notice':'日记按智能体隔离；状态、日程、梦境、关系仍为插件共享数据。历史仅从启用归档后积累。'}
+                'shared_data_notice':'AI 陪伴档案：'+str(self.c['_PROFILE_CTX'].get() or 'shared')+'；宿主日记来自 '+agent_id+' 的工作区。历史仅从启用归档后积累。'}
 
     async def discover(self,request,agent_id):
         self.o.require_bound(agent_id)

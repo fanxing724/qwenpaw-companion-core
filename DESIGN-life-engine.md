@@ -1,5 +1,7 @@
 # 生活引擎设计（Life Engine）
 
+> 历史设计与试点记录。当前产品定义以 [DESIGN.md](DESIGN.md) 为准，实际实现与未解决问题见 [FILE_REVIEW.md](FILE_REVIEW.md)。下方“待开发”、试点配置与当时验收状态保留为历史，不作为当前能力或部署状态的保证。
+
 由番星与 QA Agent 联合设计。目标：缩小与 `astrbot_plugin_private_companion` 的"拟人感"差距——让 bot 在无人值守时也有连续生活，而不是一块等待填写的白板。
 
 ## 差距诊断（2026-10-16 实测结论）

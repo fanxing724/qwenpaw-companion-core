@@ -174,8 +174,7 @@ def test_binding_config_and_unbinding_are_agent_scoped(binding_host):
 def test_actual_tool_call_tracking_and_prompt_scope(binding_host, monkeypatch):
     import asyncio
     module, client, sdk, _, _, _ = binding_host
-    if not sdk:
-        return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     prefix = '/api/companion-core'
     client.put(prefix + '/agents/alice/binding', json={'enabled':True})
     monkeypatch.setattr(module, '_current_agent_id', lambda: 'alice')
@@ -195,8 +194,7 @@ def test_actual_tool_call_tracking_and_prompt_scope(binding_host, monkeypatch):
 
 def test_binding_reload_failure_is_not_reported_as_live(binding_host, monkeypatch):
     module, client, sdk, _, _, _ = binding_host
-    if not sdk:
-        return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     monkeypatch.setattr(sys.modules['qwenpaw.app.utils'], 'schedule_agent_reload', lambda *args: False)
     result = client.put('/api/companion-core/agents/alice/binding', json={'enabled':True}).json()
     assert result['agent']['binding'] == 'bound'
@@ -284,6 +282,8 @@ def test_organizer_preview_apply_and_backup(organizer_host, monkeypatch):
         assert client.post(prefix+'/organizer/preview',json={'agent_id':'alice','chat_id':'chat-a'}).status_code == 503
         return
     def complete(provider, messages, tokens):
+        assert '记录主体是当前 AI 智能体' in messages[0]['content']
+        assert '用户的心情、睡眠、日程和梦境不得写成 AI 的经历' in messages[0]['content']
         assert provider[1] == 'small-cheap-model'
         assert tokens == 1200
         assert all(secret not in json.dumps(messages) for secret in ['SYSTEM SECRET','TOOL SECRET','PRIVATE IMAGE'])
@@ -310,7 +310,7 @@ def test_organizer_preview_apply_and_backup(organizer_host, monkeypatch):
 
 def test_organizer_rejects_invalid_results_and_conflicts(organizer_host, monkeypatch):
     _, client, sdk, prefix, organizer, _, _, _ = organizer_host
-    if not sdk: return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     before = organizer.snapshot()
     monkeypatch.setattr(organizer,'complete',lambda *args: ({'energy':1000},{}))
     request = {'agent_id':'alice','chat_id':'chat-a'}
@@ -344,7 +344,7 @@ def test_organizer_auto_hook_cooldown_dedup_and_stop(organizer_host, monkeypatch
     import asyncio
     from types import SimpleNamespace as NS
     _, client, sdk, prefix, organizer, workspace, chat, _ = organizer_host
-    if not sdk: return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     hooks = types.ModuleType('qwenpaw.runtime.hooks')
     hooks.HookBase = type('HookBase',(),{})
     hooks.HookResult = type('HookResult',(),{})
@@ -421,7 +421,7 @@ def test_organizer_real_http_contract_and_redirect_secret_protection(organizer_h
 
 def test_organizer_six_modules_validate_before_any_write(organizer_host, monkeypatch):
     _, client, sdk, prefix, organizer, _, _, _ = organizer_host
-    if not sdk: return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     config = client.get(prefix+'/organizer/config').json()['config']
     for module in config['modules'].values():module['enabled']=True
     assert client.put(prefix+'/organizer/config',json=config).status_code==200
@@ -593,7 +593,7 @@ def test_backfill_name_inference_is_local_and_preserves_data(file_host, monkeypa
 
 def test_backfill_soul_name_fallback_and_current_name_conflict(file_host):
     module,client,sdk,prefix,owner,root=file_host
-    if not sdk:return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     endpoint=prefix+'/organizer/backfill'
     (root/'agent.json').unlink()
     client.post(prefix+'/setup',json={'user_name':'现有称呼','companion_name':'原伙伴'})
@@ -610,7 +610,7 @@ def test_backfill_soul_name_fallback_and_current_name_conflict(file_host):
 
 def test_backfill_full_review_redaction_and_exact_sending(file_host,monkeypatch):
     module,client,sdk,prefix,owner,root=file_host
-    if not sdk:return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     config=client.get(prefix+'/organizer/config').json()['config']
     for key in config['modules']:config['modules'][key]['enabled']=key in {'relationship','dates'}
     client.put(prefix+'/organizer/config',json=config)
@@ -657,7 +657,7 @@ def test_backfill_full_review_redaction_and_exact_sending(file_host,monkeypatch)
 
 def test_backfill_conflicts_invalid_outputs_and_source_boundaries(file_host,monkeypatch):
     module,client,sdk,prefix,owner,root=file_host
-    if not sdk:return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     endpoint=prefix+'/organizer/backfill'
     config=client.get(prefix+'/organizer/config').json()['config']
     config['modules']['relationship']['enabled']=True
@@ -692,7 +692,7 @@ def test_backfill_conflicts_invalid_outputs_and_source_boundaries(file_host,monk
 
 def test_backfill_expiry_config_changes_and_failed_requests_need_new_review(file_host,monkeypatch):
     module,client,sdk,prefix,owner,root=file_host
-    if not sdk:return
+    if not sdk: pytest.skip('This case requires the PawApp SDK fixture')
     endpoint=prefix+'/organizer/backfill'
     config=client.get(prefix+'/organizer/config').json()['config']
     config['modules']['relationship']['enabled']=True

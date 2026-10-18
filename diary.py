@@ -2,9 +2,14 @@
 """Opt-in companion diary: model-drafted from real records, preview then apply.
 
 日记只从当天真实记录（history 快照、当日便签）起草；无模型配置不生成，
-不编造内容。写入前预览确认；已存在的日记拒绝覆盖（409），删除需显式调用。
+不编造内容。手动生成预览确认，显式启用自动任务后可自动写入；已有日记拒绝覆盖，删除需显式调用。
 模型配置复用 organizer 的 dreams 模块（未单独配置时回退公共模型）。
+
+
+AI 自身陪伴经历的叙事层，输出存于当前档案 diary/。
+与宿主 memory/ 日记分开；生成、确认写入与让 AI 回读是三个阶段，见 DESIGN.md。
 """
+import asyncio
 import json
 import re
 import threading
@@ -88,8 +93,10 @@ def _valid_day(day):
 
 def install(router, owner, life):
     c = owner.c
+    c["DiarySettings"] = DiarySettings
     c["_diary_complete"] = _raw_complete
     lock = threading.RLock()
+    settings_lock = asyncio.Lock()
     pending = {}
     settings_path = c["_DATA_DIR"] / "diary-settings.json"
     diary_dir = c["_DATA_DIR"] / "diary"
@@ -163,13 +170,13 @@ def install(router, owner, life):
             name = "companion_diary_tick"
             priority = 2
 
+            @c["_profiled_hook"]
             async def run(self, ctx):
-                c["_use_profile"](getattr(ctx, "agent_id", None))
                 cfg = read_settings()
                 context = getattr(ctx.request, "request_context", None) or {}
                 if context.get("source") == "cron" and context.get("cron_job_id") == job_id(cfg.get("agent_id", "")):
                     token = getattr(ctx.request, "companion_diary_token", None)
-                    if token and cfg.get("token") == token:
+                    if cfg.get("auto") and cfg.get("agent_id") == getattr(ctx, "agent_id", None) and token and cfg.get("token") == token:
                         await generate_today()
                     return HookResult(action=HookAction.SKIP_AGENT)
                 return HookResult()
@@ -215,17 +222,30 @@ def install(router, owner, life):
                 return info
             provider = owner.provider(owner.settings(), "dreams")
             settings = read_settings()
+            if not settings.get("auto"):
+                info.update({"state":"skipped", "reason":"disabled", "at":c["_now_ts"]()})
+                write_status(info)
+                return info
             messages = [
                 {"role": "system", "content":
-                 "你是陪伴角色本人。只依据用户提供的事实写第一人称日记，"
+                 "你以当前 AI 陪伴角色的第一人称，依据其状态与陪伴记录写 AI 日记。严格区分 AI 与用户的经历，用户自述的心情、作息或梦境不得写成 AI 的经历。"
                  f"不超过{MAX_CHARS}字；没有的事实一律不写；直接输出正文，不要 JSON、不要代码块、不要标题。"},
                 {"role": "user", "content": f"日期：{day}\n事实：\n" + "\n".join(facts)},
             ]
-            text, usage = c["_diary_complete"](provider, messages, settings["tokens"])
+            text, usage = await asyncio.to_thread(c["_diary_complete"], provider, messages, settings["tokens"])
             c["_record_usage"]("diary", usage)
             if not text or len(text) > MAX_CHARS:
                 raise ValueError("empty or overlong model text")
-            c["_write_text"](path, text)
+            with lock, c["_lock"]:
+                if read_settings() != settings:
+                    info.update({"state":"skipped", "reason":"settings-changed", "at":c["_now_ts"]()})
+                    write_status(info)
+                    return info
+                if path.exists() or day_facts(day) != facts:
+                    info.update({"state":"skipped", "reason":"records-changed", "at":c["_now_ts"]()})
+                    write_status(info)
+                    return info
+                c["_write_text"](path, text)
             info.update({"state": "written", "date": day, "chars": len(text),
                          "usage": usage, "at": c["_now_ts"]()})
             write_status(info)
@@ -254,7 +274,7 @@ def install(router, owner, life):
             return None
         return None
 
-    async def register_job(agent_id):
+    async def register_job(agent_id, settings):
         ws = await _workspace(agent_id)
         manager = getattr(ws, "cron_manager", None)
         if not c["care"].scheduling_supported(manager):
@@ -263,7 +283,6 @@ def install(router, owner, life):
         if not chats:
             raise HTTPException(400, "该智能体没有可用会话作为静默投递目标")
         target = chats[0]
-        settings = read_settings()
         hour, minute = settings["time"].split(":")
         from qwenpaw.app.crons.models import CronJobSpec
         spec = CronJobSpec.model_validate({
@@ -296,24 +315,46 @@ def install(router, owner, life):
 
     @router.put("/diary/settings")
     async def put_diary_settings(payload: DiarySettings):
-        with lock:
+        # Keep a failed registration from publishing a fictitious enabled state.
+        async with settings_lock:
             previous = read_settings()
-            data = payload.model_dump()
+            data = {**previous, **payload.model_dump(exclude_unset=True, exclude={"token"})}
             data["token"] = previous.get("token") or __import__("uuid").uuid4().hex
-            write_settings(data)
-        if data["auto"] and not previous.get("auto"):
-            agent_id = data["agent_id"]
-            if not agent_id:
-                agent_id = first_bound_agent()
+            if data["auto"]:
+                agent_id = data.get("agent_id") or c["_request_agent"]() or first_bound_agent()
                 if not agent_id:
-                    raise HTTPException(400, "请先绑定一个智能体，自动日记需要它作为触发载体")
+                    raise HTTPException(400, "请先选择并绑定一个智能体，再开启自动日记")
+                owner.require_bound(agent_id)
+                # A previously configured trigger may belong to another profile.
+                if c["_profile_map"]().get(agent_id, "shared") != (c["_PROFILE_CTX"].get() or "shared"):
+                    raise HTTPException(409, "自动日记的触发智能体与当前档案不一致")
                 data["agent_id"] = agent_id
-                with lock:
+                try:
+                    await register_job(agent_id, data)
+                    if previous.get("auto") and previous.get("agent_id") != agent_id:
+                        await unregister_job(previous["agent_id"])
                     write_settings(data)
-            await register_job(agent_id)
-        if not data["auto"] and previous.get("auto") and previous.get("agent_id"):
-            await unregister_job(previous["agent_id"])
-        return read_settings()
+                except Exception as exc:
+                    # Best-effort compensation; never expose candidate configuration.
+                    try:
+                        if previous.get("auto") and previous.get("agent_id"):
+                            await register_job(previous["agent_id"], previous)
+                        if not previous.get("auto") or previous.get("agent_id") != agent_id:
+                            await unregister_job(agent_id)
+                    except Exception:
+                        write_status({"state":"job-reconcile-required", "at":c["_now_ts"]()})
+                    if isinstance(exc, HTTPException):
+                        raise
+                    raise HTTPException(503, "自动日记任务更新失败，原配置保持不变；请检查宿主任务状态") from None
+            else:
+                # Persist the off switch first; any orphan tick must remain inert.
+                write_settings(data)
+                if previous.get("auto") and previous.get("agent_id"):
+                    try:
+                        await unregister_job(previous["agent_id"])
+                    except Exception:
+                        write_status({"state":"disabled-cleanup-pending", "at":c["_now_ts"]()})
+            return read_settings()
 
     @router.get("/diary/{day}")
     def get_diary(day: str):
@@ -351,17 +392,17 @@ def install(router, owner, life):
             raise HTTPException(400, f"日记模型未配置或不可用：{exc}") from None
         messages = [
             {"role": "system", "content":
-             "你是陪伴角色本人。只依据用户提供的事实写第一人称日记，"
+             "你以当前 AI 陪伴角色的第一人称，依据其状态与陪伴记录写 AI 日记。严格区分 AI 与用户的经历，用户自述的心情、作息或梦境不得写成 AI 的经历。"
              f"不超过{MAX_CHARS}字；没有的事实一律不写；直接输出正文，不要 JSON、不要代码块、不要标题。"},
             {"role": "user", "content": f"日期：{day}\n事实：\n" + "\n".join(facts)},
         ]
         try:
             text, usage = c["_diary_complete"](provider, messages, settings["tokens"])
         except HTTPException:
-            c["_record_usage"]("diary", usage)
             raise
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(502, f"模型调用失败：{exc}") from None
+        c["_record_usage"]("diary", usage)
         if not text or len(text) > MAX_CHARS:
             raise HTTPException(502, "模型返回为空或超长，已拒绝")
         with lock:
@@ -372,10 +413,12 @@ def install(router, owner, life):
 
     @router.post("/diary/apply")
     def apply_diary(payload: DiaryApplyRequest):
-        with lock:
+        with lock, c["_lock"]:
             entry = owner.backfill.get(pending, payload.preview_id)
             if not entry:
                 raise HTTPException(410, "预览已过期或不存在，请重新生成")
+            if day_facts(entry['date']) != entry['facts']:
+                raise HTTPException(409, "日记预览后来源记录已变化，请重新生成")
             diary_dir.mkdir(parents=True, exist_ok=True)
             path = diary_dir / f"{entry['date']}.md"
             if path.is_symlink():

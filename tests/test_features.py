@@ -534,6 +534,7 @@ def test_diary_preview_apply_conflict_and_no_fabrication(loaded,monkeypatch):
             k:{} for k in ('state','schedule','dreams','notes','relationship','dates')}}),encoding='utf-8')
     seen={}
     def fake(provider,messages,tokens):
+        assert 'AI 与用户的经历' in messages[0]['content']
         seen['facts']=messages[1]['content']
         return '今天写了代码，心情平静。', {'total_tokens':12}
     monkeypatch.setattr(module,'_diary_complete',fake)
@@ -561,7 +562,7 @@ def test_diary_preview_apply_conflict_and_no_fabrication(loaded,monkeypatch):
     # 开启自动日记需要已绑定智能体作为触发载体，否则明确拒绝
     assert client.put(prefix+'/diary/settings',json={'auto':True,'time':'22:30'}).status_code==400
     assert client.put(prefix+'/diary/settings',json={'auto':False,'time':'22:30'}).json()['auto'] is False
-    assert client.get(prefix+'/diary/status').json() == {} or True
+    assert client.get(prefix+'/diary/status').json() == {}
 
 
 def test_plan_rule_fallback_model_validation_and_apply(loaded,monkeypatch):

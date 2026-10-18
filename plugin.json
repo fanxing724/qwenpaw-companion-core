@@ -1,11 +1,11 @@
 {
   "id": "companion-core",
   "name": "陪伴核心",
-  "version": "2.13.0",
-  "description": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期；生活引擎按作息自动演化状态并跨日生成日程；检查页自检与一键修复；支持搜索编辑、备份恢复、反馈入口与 REST API。",
+  "version": "2.14.0",
+  "description": "AI 陪伴工作台：积累 AI 自身的状态、作息、梦境与陪伴经历，以及它记住的事项、关系与重要日期，供智能体读取并延续拟人表现；面板用于观察、配置和校正。",
   "description_i18n": {
-    "zh-CN": "一体化陪伴插件：今日总览、状态、日程、梦境、便签、关系与重要日期；生活引擎按作息自动演化状态并跨日生成日程；检查页自检与一键修复；支持搜索编辑、备份恢复、反馈入口与 REST API。",
-    "en-US": "All-in-one companion: daily overview, state, schedules, dreams, notes, relationships and important dates; a rule-based life engine evolves state from your routine and generates each day's schedule; self-check page with one-click repairs; search, editing, backup/restore, feedback entries and REST API."
+    "zh-CN": "AI 陪伴工作台：积累 AI 自身的状态、作息、梦境与陪伴经历，以及它记住的事项、关系与重要日期，供智能体读取并延续拟人表现；面板用于观察、配置和校正。",
+    "en-US": "AI companion workbench: maintain the AI companion's state, routine, dreams, experiences, remembered matters and relationships for continuity in personified responses. The dashboard observes, configures and corrects these records."
   },
   "author": "QwenPaw Community",
   "license": "MIT",
@@ -21,7 +21,7 @@
   "menu": {
     "label": "陪伴核心",
     "icon": "💞",
-    "description": "一体化陪伴系统：状态管理、梦境、日程、便签、关系记录与重要日期",
+    "description": "AI 陪伴工作台：查看与配置 AI 状态、作息、记忆和陪伴经历",
     "location": "primary.settings"
   },
   "permissions": [
@@ -41,22 +41,22 @@
     "tools": [
       {
         "name": "companion_get_state",
-        "description": "读取当前状态（心情、精力、睡眠等）",
+        "description": "读取 AI 自身状态（心情、精力、睡眠等）",
         "icon": "🌤"
       },
       {
         "name": "companion_get_schedule",
-        "description": "读取今日日程",
+        "description": "读取 AI 自身的当日作息与活动安排",
         "icon": "📅"
       },
       {
         "name": "companion_get_notes",
-        "description": "读取便签列表",
+        "description": "读取 AI 记住的事项与关怀线索",
         "icon": "📝"
       },
       {
         "name": "companion_get_relationship",
-        "description": "读取关系记录（亲密度、里程碑）",
+        "description": "读取 AI 与用户的关系记录（亲密度、里程碑）",
         "icon": "💕"
       },
       {
@@ -66,7 +66,7 @@
       },
       {
         "name": "companion_update_state",
-        "description": "更新状态（心情、精力等字段）",
+        "description": "更新 AI 自身状态（心情、精力等字段）",
         "icon": "🌤"
       },
       {

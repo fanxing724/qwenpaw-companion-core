@@ -29,7 +29,8 @@ for (const mode of ['plain', 'api-prefix', 'no-helper', 'menu-only', 'route-fail
   // Default shows every tab; collapsing is an explicit user choice (localStorage).
   const tabsNode = tree.children.find(c => c && c.props && Array.isArray(c.props.items));
   assert.equal(tabsNode.props.items.length, 16);
-  effects[0]();
+  assert.equal(tabsNode.props.destroyInactiveTabPane, false, "switching tabs preserves drafts");
+  effects[1]();
   await new Promise(resolve => setImmediate(resolve));
   const base = mode === 'base-path' ? '/paw/api' : '/api';
   const mount = mode === 'legacy-router' ? '/plugins' : '';

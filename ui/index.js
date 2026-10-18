@@ -1,5 +1,7 @@
 /**
- * Companion Core — frontend dashboard.
+ * Companion Core — AI companion workbench: observe, configure and correct AI records.
+ * The AI is the record subject; this panel is not a user lifestyle journal.
+ * Read DESIGN.md and FILE_REVIEW.md before changing product flows.
  *
  * Companion data, agent binding and independent-model chat organization.
  * Dark mode via host.useTheme(); API calls go through host.getApiUrl().
@@ -49,6 +51,7 @@
 
   var MESSAGES = {
     zh: {
+      stateOwnerHint:"这里记录 AI 自身的心情、精力与拟人状态；手动编辑用于调整 AI 档案。", pluginDiary:"AI 陪伴日记", hostDiary:"宿主记忆日记", privateBackup:"完整私密备份（全部档案与配置，含密钥）", privateBackupHint:"私密备份含所有 AI 档案与模型密钥，请妥善保管。恢复后自动功能保持关闭，需重新启用。", scopeChoose:"选择 AI 智能体", scopeHost:"跟随宿主（未选择时使用共用档案）", scopeSwitchHint:"切换智能体会清除当前未保存的草稿。", modelNotConfigured:"未配置", modelConnection:"模型连接", organizeChat:"整理聊天", advancedSettings:"高级参数与模块设置", organizerSaveHint:"更改设置后先保存，再生成预览。", currentAgent:"当前智能体", sharedContext:"未选择（使用共用档案）", contextHint:"此处选择的 AI 同时用于日常档案、聊天整理、回顾与关怀；切换目标后重新读取对应数据。", contextUnavailable:"档案信息读取失败，请刷新重试",
       discoverHost:"发现宿主模型（不复制密钥）",tabTimeline:"那一天",tabCare:"关怀任务",bfOnThisDay:"那年今日",bfDiary:"日记",bfHistoryEmpty:"该日期暂无状态或日程历史；不会用今天的数据补填。",bfHistoryDates:"可查看的日期",milestoneHint:"这里只展示已确认的关系里程碑。不会从文件修改时间推断事件，也不会虚构“第一次”。关系记录仍由插件共享。",milestoneExtract:"从记忆提取候选（先预览）",bfMilestones:"我们的大事记",bfDraft:"生成本地跟进草稿",bfWhen:"预约时间（留空则按队列规则）",bfFollowup:"问问现在怎么样",bfFollowupHint:"根据选中的日记写一条跟进草稿，确认后加入关怀队列；不会立即发送。",bfQueueFollowup:"确认加入跟进队列",bfScore:"预览可解释亲密度",bfScoreTotal:"建议分数",bfScoreApply:"确认采用此分数",
       careIntro:"定时、首见、增量、模型问候和梦境默认关闭。选择真实接收目标并确认后启用，定时检查复用宿主调度器，每五分钟合并处理；静默时段保留待办，结束后补发。",careModel:"自动生成一句人设问候（每批最多一次模型调用）",careEnabled:"启用定时关怀",careFirst:"启用每日首见提示（成功响应后持久记录）",careSync:"启用本地记忆变化提示（不自动调用模型或写入事实）",careMorning:"根据当天日程发送问候",careDateSuggestion:"建议提前提醒",careDateScope:"纪念日范围（不选则全部）",careDateSuggestionHint:"提醒建议：提前 3 天；请选择智能体和目标，再预览并确认启用。",careDates:"临近纪念日提醒",careInactive:"久未互动跟进",careDream:"启用一次晚间创作梦境（明确标为创作）",careNoScheduler:"宿主暂不支持兼容调度；可用时启用首见提示。",careTarget:"投递目标",careSelectTarget:"请选择会话目标",careTime:"每日问候最早时间",careQuietStart:"静默开始",careQuietEnd:"静默结束",careMax:"每日合并消息上限",careInactiveDays:"未互动天数",careLead:"纪念日提前天数",careStyleHint:"风格供首见 Agent 与可选模型问候使用；原始提醒事实始终附在问候后。开启模型问候会发送脱敏事项和这段风格，请先审阅请求；不改写 SOUL 或技能文件。",careReadStyle:"读取 SOUL 风格（本地预览）",carePreview:"保存前核对规则与接收者",careConsent:"我已核对接收者、开关、静默时段和消息上限，确认保存。",careReview:"预览完整规则与模型请求（不启用）",careSave:"确认保存关怀设置",careStop:"停止定时关怀",careAttempt:"按保存规则尝试一次",careAttemptConfirm:"将向已保存目标尝试投递，仍遵守静默、去重与频率限制。确定继续？",careIgnoreSync:"忽略本批变更提示（不写事实）",careIgnoreConfirm:"仅清空本批记忆变更提示，不修改原文件或陪伴记录，确定？",careQueue:"延迟与首见队列",careRetry:"核实未收到，重新排队",careRetryConfirm:"请先核实未收到；重新排队可能导致重复投递。确认继续？",careAck:"确认已处理",careAckConfirm:"确认该事项已处理？对应便签将标记为已提醒。",
 
@@ -61,7 +64,7 @@
 
       setupTitle:"开始你的陪伴记录", setupOpen:"使用引导", quickSetup:"快速配置", navMore:"更多", navCollapse:"收起自选页签", navExpand:"展开全部页签", navCustomize:"自定义导航", navCustomizeHint:"勾选的页签留在主行；取消勾选的在收起时进入「更多」菜单。当前打开的页签始终可见。", supportAuthor:"支持作者", feedback:"反馈", feedbackGitHub:"GitHub 提 Issue", feedbackPlatform:"平台社区反馈", setupStep:"第 {step} 步，共 4 步",
       setupLife:"开启生活引擎", setupLifeHint:"让睡眠/饥饿/精力按当前时间与今日日程自动演化。纯规则、不调用模型、不消耗 token，随时可以关闭。", setupLifeNow:"现在开启", setupLifeOn:"已开启", setupModelOptional:"配置 AI 模型（可选）", setupNames:"认识彼此", setupNamesHint:"称呼可以留空。记录从真实的聊天和生活开始。", setupUser:"你的称呼", setupCompanion:"陪伴对象的称呼", setupExisting:"已检测到已有记录。本引导只保存设置，会保留现有数据。", setupClean:"从空白记录开始：不预填心情、作息或关系分数。", setupAgent:"连接智能体", setupAgentHint:"选择一个智能体并启用陪伴工具，也可以稍后在“智能体绑定”中操作。", setupChoose:"暂不绑定", setupBindNext:"绑定并继续", setupModel:"配置 AI 模型", setupModelHint:"可填写一个便宜小模型，供各模块共用。也可跳过，之后在“AI 设置”中配置。保存本身不会调用模型，自动整理保持原来的开关状态。", setupNext:"下一步", setupBack:"上一步", setupLater:"稍后设置", setupFinish:"完成设置", setupMissingModel:"请同时填写 API 地址和模型名称，或选择稍后设置。", orgUseShared:"公共模型", noScore:"尚未记录",
-      tabOrganizer:"AI 设置", orgIntro:"使用独立的小模型整理近期聊天，不占用主聊天模型。近期文字会发送至你配置的 API。每个启用模块最多调用一次，六个模块最多六次；实际费用按服务商计费。",
+      tabOrganizer:"AI 设置", orgIntro:"使用独立的小模型从近期聊天整理 AI 自身的状态、安排和陪伴记录。近期文字会发送至你配置的 API。每个启用模块最多调用一次，六个模块最多六次；实际费用按服务商计费。",
       orgBase:"API 基址（例如 https://example.com/v1）", orgModel:"模型名称", orgKey:"API Key（留空保留已保存密钥）", orgKeySaved:"已保存密钥", orgKeyEmpty:"未设置密钥（支持免密本地接口）", orgKeyClear:"清除已保存密钥", orgInherit:"留空继承公共设置；不同 API 地址不继承公共密钥",
       orgAgent:"整理目标智能体", orgChooseAgent:"选择已绑定的智能体", orgChat:"近期会话", orgChooseChat:"选择一个会话", orgAuto:"聊天结束自动整理", orgAutoHint:"自动整理默认关闭。开启后仅处理目标智能体，在聊天结束后按最小间隔运行，无新内容则跳过；会自动写入数据并保留最近 10 份轮换备份。",
       orgNoAuto:"此宿主不支持自动整理钩子，可手动整理。", orgInterval:"最小间隔（分钟）", orgMessages:"最多读取消息数", orgChars:"聊天文字上限（字符）", orgTokens:"每个模块最大输出 token", orgEnabled:"启用此模块", orgPrompt:"模块整理规则 / 提示词", orgSchema:"数据定义（固定结构，点击查看）",
@@ -72,13 +75,13 @@
       agentDisabled: "智能体已停用", agentNoCalls: "尚未观察到调用（仅记录本次插件运行期间）", agentLastCall: "最近实际调用", agentSuccess: "成功", agentError: "失败",
       agentTest: "绑定后，在该智能体的新对话里发送：请调用 companion_get_state 和 companion_get_notes，告诉我当前心情及便签。随后点击刷新，查看是否出现实际调用记录。",
       agentEmpty: "宿主中没有可绑定的智能体。", agentRefresh: "刷新状态", agentTools: "工具启用数", agentSaved: "配置已保存", agentNoSdk: "当前宿主不支持智能体绑定。",
-      tabOverview: "今日总览", overviewHint: "把今天的状态、安排和牵挂放在一起。",
-      pendingNotes: "待提醒便签", upcoming: "即将到来", nextPlan: "今天的安排",
-      quickActions: "快速前往", welcome: "每一天，都值得好好记录", todayLabel: "今日陪伴",
+      tabOverview: "今日总览", overviewHint: "看看 AI 今天的状态、作息，以及它记挂的事。",
+      pendingNotes: "待提醒便签", upcoming: "即将到来", nextPlan: "AI 今天的安排",
+      quickActions: "快速前往", welcome: "让 AI 的状态与陪伴经历延续下去", todayLabel: "今日陪伴",
       search: "搜索记录…", noResults: "没有匹配的记录", allNotes: "全部", pendingOnly: "待提醒",
       editNote: "编辑便签", editSchedule: "编辑日程", timeInvalid: "请输入有效时间 HH:MM",
-      scheduleHint: "日程按时间排列，可随时调整。", notesHint: "记下小事，也留住重要的叮嘱。",
-      dreamsHint: "记录醒来前的片刻，留住梦里的世界。", datesHint: "让每个重要的日子都被记得。",
+      scheduleHint: "这是 AI 自身的作息与活动安排，生活引擎会据此演化它的状态。", notesHint: "AI 记住的叮嘱、约定，以及需要关心用户的事。",
+      dreamsHint: "AI 讲述的梦境与明确标注的创作。", datesHint: "让每个重要的日子都被记得。",
       staleSchedule: "这份安排来自 {date}，请留意日期。", records: "{count} 条记录",
       routineOn: "自动作息：已开启（{count} 条）", routineOff: "自动作息：未开启",
       routineSave: "保存为作息模板", routineDisable: "停用自动作息", routineEnable: "启用自动作息",
@@ -86,19 +89,19 @@
       routineSaved: "已保存为作息模板，明天起自动生成今日日程", routineDisabled: "已停用自动作息",
       routineEnabled: "已启用自动作息", routineApplied: "已按模板生成今日日程",
       routineHint: "作息模板让每天自动有日程，生活引擎才能跨日持续演化；当天的手动修改不会被覆盖。",
-      tabDiary: "陪伴日记", diaryHint: "日记只从当天真实记录起草，预览确认后才写入；无记录不生成。",
+      tabDiary: "陪伴日记", diaryHint: "从 AI 当天的状态与陪伴记录起草它的日记，预览确认后写入；无记录不生成。",
       diaryGenerate: "生成今日日记预览", diaryPreviewed: "预览已生成", diaryApply: "确认写入", diaryWritten: "日记已写入",
       diaryAuto: "自动日记", diaryAutoOn: "自动日记已开启", diaryAutoOff: "自动日记已关闭", diaryTime: "生成时间",
       diaryEmpty: "还没有日记", diaryFromModel: "模型起草", diaryFromRule: "规则草稿", view: "查看",
       planTitle: "规划模式", planGenerate: "生成规划预览", planPreviewed: "规划预览已生成", planApply: "应用作息与整理节奏",
       planApplied: "规划已应用", planWeekend: "周末版", planOrganizer: "整理节奏：", planCare: "关怀建议时间：",
-      weeklyTitle: "周回顾", weeklyHint: "从本周真实记录（状态/日记/便签/互动/关怀）起草，预览确认后写入；无记录不生成。",
+      weeklyTitle: "周回顾", weeklyHint: "从 AI 本周的状态、日记与陪伴互动记录起草回顾，预览确认后写入；无记录不生成。",
       weeklyGenerate: "生成本周回顾", weeklyWritten: "周回顾已写入",
       usageTitle: "模型用量", usageHint: "整理、日记、周回顾与规划的 token 消耗按来源累计，仅统计宿主返回的用量。",
       usageEmpty: "还没有模型调用记录", usageCalls: "{count} 次", usageTokens: "{count} tokens", usageRecent: "最近明细",
       profileLabel: "数据档案", profileShared: "共用（shared）", profileOwn: "独立档案", profileCustom: "自定义组名",
       profileSaved: "档案已保存", profileHint: "不同档案的陪伴数据完全隔离；切换不迁移已有数据，可用导出/导入搬迁。",
-      summaryMood: "此刻心情", summaryEnergy: "今日精力", summaryWarmth: "关系温度",
+      summaryMood: "AI 此刻心情", summaryEnergy: "AI 今日精力", summaryWarmth: "关系温度",
       openSection: "打开", summaryEmpty: "慢慢来，从一条记录开始。", viewAll: "查看全部",
 
       appTitle: "陪伴核心", appSubtitle: "状态 · 日程 · 梦境 · 便签 · 关系 · 重要日期 · 数据",
@@ -117,7 +120,7 @@
       checkupOk: "正常", checkupWarn: "建议处理", checkupError: "需要修复",
       checkupFix: "一键修复", checkupFixAll: "一键修复全部", checkupFixAllDone: "已修复 {done} 项，失败 {failed} 项", checkupNothingToFix: "没有可自动修复的项目", checkupAskAi: "发给 Agent 修复", checkupGoto: "去设置",
       checkupFixed: "已修复", checkupFixFailed: "修复失败: {error}", checkupCopied: "修复指令已复制，粘贴到 Agent 聊天中即可",
-      noState: "还没有状态数据", noPlan: "今天还没有安排", noDreams: "还没有梦境记录",
+      noState: "AI 还没有状态记录", noPlan: "AI 今天还没有作息安排", noDreams: "还没有 AI 的梦境记录",
       dreamOf: "{date} 的梦", newDream: "写梦",
       dreamContent: "梦境内容", dreamDate: "日期（留空为今天）",
       newSchedule: "添加日程", scheduleTime: "时间（如 08:20）",
@@ -136,8 +139,8 @@
       dateInvalid: "日期格式须为 YYYY-MM-DD",
       confirmDeleteDate: "确定删除「{name}」吗？",
       exportData: "导出数据", importData: "导入数据",
-      exportDesc: "下载所有陪伴数据的 JSON 备份文件。",
-      importDesc: "恢复备份中包含的数据；梦境按日期合并。",
+      exportDesc: "默认导出当前 AI 档案的业务记录、日记、回顾和统计，不含模型密钥。",
+      importDesc: "完整备份恢复会影响其中的全部 AI 档案并关闭自动功能。恢复备份中包含的数据；梦境按日期合并。",
       importSuccess: "数据导入成功，已恢复: {fields}",
       exportSuccess: "数据已导出", importFailed: "导入失败: {error}",
       timeRequired: "请填写时间", activityRequired: "请填写活动",
@@ -147,6 +150,7 @@
       isToday: "就是今天", tomorrow: "明天", inDays: "还有 {count} 天",
     },
     en: {
+      stateOwnerHint:"These are the AI companion's mood, energy and personified state. Manual edits adjust its profile.", pluginDiary:"AI companion diary", hostDiary:"Host memory diary", privateBackup:"Complete private backup (all profiles, settings and keys)", privateBackupHint:"Contains all AI profiles and model keys. Keep it private. Automation stays off after restoration until explicitly enabled.", scopeChoose:"Choose AI agent", scopeHost:"Follow host (shared profile if none selected)", scopeSwitchHint:"Switching agents clears current unsaved drafts.", modelNotConfigured:"Not configured", modelConnection:"Model connection", organizeChat:"Organize a conversation", advancedSettings:"Advanced parameters and modules", organizerSaveHint:"Save changed settings before generating a preview.", currentAgent:"Current agent", sharedContext:"Shared profile (no agent selected)", contextHint:"These are the selected AI companion's state and life records. Chat organization, timeline and care use this same selected agent.", contextUnavailable:"Unable to load profile information. Please refresh.",
       discoverHost:"Discover host model (no key copied)",tabTimeline:"That day",tabCare:"Care tasks",bfOnThisDay:"On this day",bfDiary:"Diary",bfHistoryEmpty:"No state or schedule history for this date. Current data is never substituted.",bfHistoryDates:"Available dates",milestoneHint:"Only confirmed milestones are shown. File modification times never become event dates; first events are not invented. Relationship data remains shared.",milestoneExtract:"Extract memory candidates (preview first)",bfMilestones:"Our milestones",bfDraft:"Draft a local follow-up",bfWhen:"Schedule time (blank uses queue rules)",bfFollowup:"Follow up",bfFollowupHint:"Write a follow-up draft based on this diary. Confirmation queues it without sending immediately.",bfQueueFollowup:"Confirm and queue follow-up",bfScore:"Preview explainable warmth score",bfScoreTotal:"Proposed score",bfScoreApply:"Confirm this score",
       careIntro:"Scheduling, first-conversation hints, sync, model greetings and dreams are off by default. Confirm a real recipient before enabling. Uses the host scheduler every five minutes; quiet hours defer messages until the window ends.",careModel:"Generate a styled greeting (at most one model call per batch)",careEnabled:"Enable scheduled care",careFirst:"Enable daily first-conversation hints (persist after successful reply)",careSync:"Notify local memory changes (no automatic model calls or fact writes)",careMorning:"Greeting based on today's schedule",careDateSuggestion:"Suggest a reminder",careDateScope:"Anniversaries (empty means all)",careDateSuggestionHint:"Suggested lead time: 3 days. Choose an agent and recipient, review, then confirm enabling.",careDates:"Upcoming anniversary reminders",careInactive:"Follow up after inactivity",careDream:"Enable one evening fictional dream (labeled as creative)",careNoScheduler:"Compatible scheduling is unavailable; first-conversation hints may still be supported.",careTarget:"Recipient",careSelectTarget:"Choose a conversation target",careTime:"Earliest greeting time",careQuietStart:"Quiet hours start",careQuietEnd:"Quiet hours end",careMax:"Daily merged-message limit",careInactiveDays:"Days without interaction",careLead:"Anniversary lead days",careStyleHint:"Style is for first-conversation phrasing and optional model greetings. Original facts are always appended. Model greetings send redacted items and this style; inspect the request first. SOUL and skill files are preserved.",careReadStyle:"Preview local SOUL style",carePreview:"Review rules and recipient before saving",careConsent:"I checked the recipient, switches, quiet hours and frequency limit and confirm saving.",careReview:"Preview rules and model request (no enabling)",careSave:"Confirm care settings",careStop:"Stop scheduled care",careAttempt:"Try once with saved rules",careAttemptConfirm:"Attempt delivery to the saved recipient, respecting quiet hours, deduplication and frequency limits?",careIgnoreSync:"Dismiss memory-change hints (no fact writes)",careIgnoreConfirm:"Clear these memory-change hints without modifying files or companion records?",careQueue:"Deferred and first-conversation queue",careRetry:"Verified missing: requeue",careRetryConfirm:"Verify it was not received. Requeueing could duplicate delivery. Continue?",careAck:"Confirm handled",careAckConfirm:"Confirm this item was handled? Its note will be marked reminded.",
 
@@ -170,13 +174,13 @@
       agentDisabled: "Agent disabled", agentNoCalls: "No observed calls in this plugin run", agentLastCall: "Last actual call", agentSuccess: "Success", agentError: "Failed",
       agentTest: "After binding, start a new conversation with that agent: Please call companion_get_state and companion_get_notes and report my mood and notes. Then refresh here to check for an actual tool call.",
       agentEmpty: "No agents configured in the host.", agentRefresh: "Refresh status", agentTools: "Enabled tools", agentSaved: "Configuration saved", agentNoSdk: "This host does not support agent binding.",
-      tabOverview: "Overview", overviewHint: "Your mood, plans and reminders, together.",
-      pendingNotes: "Pending reminders", upcoming: "Coming up", nextPlan: "Today's plans",
+      tabOverview: "Overview", overviewHint: "Your AI companion's state, routine and remembered reminders.",
+      pendingNotes: "Pending reminders", upcoming: "Coming up", nextPlan: "AI's plans today",
       quickActions: "Quick access", welcome: "A little care, every day", todayLabel: "DAILY COMPANION",
       search: "Search records…", noResults: "No matching records", allNotes: "All", pendingOnly: "Pending",
       editNote: "Edit note", editSchedule: "Edit schedule", timeInvalid: "Enter a valid time HH:MM",
-      scheduleHint: "Your plans in time order. Adjust them as life happens.", notesHint: "Small thoughts and important reminders, kept close.",
-      dreamsHint: "Save a little of the world you wake up from.", datesHint: "Keep the days that matter within reach.",
+      scheduleHint: "The AI companion's routine and activities drive its life engine.", notesHint: "Reminders and commitments remembered by your AI companion.",
+      dreamsHint: "Dreams recounted or explicitly created by the AI companion.", datesHint: "Keep the days that matter within reach.",
       staleSchedule: "These plans are dated {date}. Check before following them.", records: "{count} records",
       routineOn: "Daily routine: on ({count} items)", routineOff: "Daily routine: off",
       routineSave: "Save as routine", routineDisable: "Disable routine", routineEnable: "Enable routine",
@@ -197,7 +201,7 @@
       usageEmpty: "No model calls recorded yet", usageCalls: "{count} calls", usageTokens: "{count} tokens", usageRecent: "Recent",
       profileLabel: "Data profile", profileShared: "Shared", profileOwn: "Own profile", profileCustom: "Custom group",
       profileSaved: "Profile saved", profileHint: "Profiles fully isolate companion data; switching never migrates existing records — use export/import to move them.",
-      summaryMood: "Current mood", summaryEnergy: "Energy today", summaryWarmth: "Relationship warmth",
+      summaryMood: "AI mood", summaryEnergy: "AI energy", summaryWarmth: "Relationship warmth",
       openSection: "Open", summaryEmpty: "Start small. One record is enough.", viewAll: "View all",
 
       appTitle: "Companion Core", appSubtitle: "State · Schedule · Dreams · Notes · Relationship · Dates · Data",
@@ -235,8 +239,8 @@
       dateInvalid: "Date must be YYYY-MM-DD",
       confirmDeleteDate: "Delete \"{name}\"?",
       exportData: "Export Data", importData: "Import Data",
-      exportDesc: "Download a JSON backup of all companion data.",
-      importDesc: "Restore included sections from a JSON backup; dreams merge by date.",
+      exportDesc: "Export this AI profile’s records, diaries, reviews and statistics without model keys.",
+      importDesc: "A complete backup restores all included AI profiles and disables automation. Restore included sections from a JSON backup; dreams merge by date.",
       importSuccess: "Import successful, restored: {fields}",
       exportSuccess: "Data exported", importFailed: "Import failed: {error}",
       timeRequired: "Enter the time", activityRequired: "Enter the activity",
@@ -288,12 +292,13 @@
 
   // loader 只在 deps 变化或 retry() 后重跑；alive 标记避免切换标签页后
   // 迟到的响应写到已卸载组件上。
-  function useAsync(loader, deps) {
+  function useAsync(loader, deps, active) {
     var _s = useState({ data: null, error: null, loading: true }), st = _s[0], setSt = _s[1];
     var _r = useState(0), attempt = _r[0], setAttempt = _r[1];
     var loaderRef = React.useRef(loader);
     loaderRef.current = loader;
     useEffect(function () {
+      if (active === false) return;
       var alive = true;
       setSt({ data: null, error: null, loading: true });
       loaderRef.current().then(function (d) {
@@ -302,7 +307,7 @@
         if (alive) setSt({ data: null, error: e, loading: false });
       });
       return function () { alive = false; };
-    }, (deps || []).concat([attempt]));
+    }, (deps || []).concat([attempt, active]));
     return {
       data: st.data, error: st.error, loading: st.loading,
       retry: function () { setAttempt(attempt + 1); },
@@ -376,10 +381,15 @@
     return apiMountPromise;
   }
 
+  var VIEW_AGENT = null;
+  function selectedAgentId() {
+    try { return (host.getSelectedAgentId && host.getSelectedAgentId()) || ""; }
+    catch (e) { return ""; }
+  }
+
   function apiFetch(path, opts) {
     opts = opts || {};
-    var scopedAgent = "";
-    try { scopedAgent = (host.getSelectedAgentId && host.getSelectedAgentId()) || ""; } catch (e) { scopedAgent = ""; }
+    var scopedAgent = opts.agentId || (opts.body && opts.body.agent_id) || (VIEW_AGENT === null ? selectedAgentId() : VIEW_AGENT);
     if (scopedAgent && path.indexOf("agent=") < 0 && path.indexOf("agent_id=") < 0) {
       path += (path.indexOf("?") >= 0 ? "&" : "?") + "agent=" + encodeURIComponent(scopedAgent);
     }
@@ -443,10 +453,11 @@
     addDate: function (d) { return apiFetch("/companion-core/dates", { method: "POST", body: d }); },
     deleteDate: function (n) { return apiFetch("/companion-core/dates/" + encodeURIComponent(n), { method: "DELETE" }); },
     exportAll: function () { return apiFetch("/companion-core/export?include_history=true"); },
-    importAll: function (d) { return apiFetch("/companion-core/import", { method: "POST", body: d }); },
+    exportPrivate: function () { return apiFetch("/companion-core/backup"); },
+    importAll: function (d) { return apiFetch(d.format === "companion-core-backup-v1" ? "/companion-core/backup/restore" : "/companion-core/import", { method: "POST", body: d }); },
     setup: function () { return apiFetch("/companion-core/setup"); },
-    completeSetup: function (data) { return apiFetch("/companion-core/setup",{method:"POST",body:data}); },
-    organizerConfig: function () { return apiFetch("/companion-core/organizer/config"); },
+    completeSetup: function (data, agent) { return apiFetch("/companion-core/setup",{method:"POST",body:data,agentId:agent}); },
+    organizerConfig: function (agent) { return apiFetch("/companion-core/organizer/config", {agentId:agent}); },
     saveOrganizer: function (data) { return apiFetch("/companion-core/organizer/config", {method:"PUT",body:data}); },
     organizerChats: function (id) { return apiFetch("/companion-core/organizer/chats?agent_id=" + encodeURIComponent(id)); },
     timeline:function(agent,day){return apiFetch('/companion-core/timeline?agent_id='+encodeURIComponent(agent)+'&day='+encodeURIComponent(day));},
@@ -472,8 +483,8 @@
     organizerApply: function (id) { return apiFetch("/companion-core/organizer/apply", {method:"POST",body:{preview_id:id}}); },
     agents: function () { return apiFetch("/companion-core/agents"); },
     bindAgent: function (id, enabled) { return apiFetch("/companion-core/agents/" + encodeURIComponent(id) + "/binding", {method:"PUT", body:{enabled:enabled}}); },
-    getLife: function () { return apiFetch("/companion-core/life"); },
-    putLife: function (enabled) { return apiFetch("/companion-core/life", { method: "PUT", body: { enabled: enabled } }); },
+    getLife: function (agent) { return apiFetch("/companion-core/life",{agentId:agent}); },
+    putLife: function (enabled, agent) { return apiFetch("/companion-core/life", { method: "PUT", body: { enabled: enabled }, agentId:agent }); },
     getCheckup: function () { return apiFetch("/companion-core/checkup"); },
     fixCheckup: function (body) { return apiFetch("/companion-core/checkup/fix", { method: "POST", body: body }); },
     health: function () { return apiFetch("/companion-core/health").then(function(data){BUSINESS_TIMEZONE=data.timezone||BUSINESS_TIMEZONE;BUSINESS_DAY=data.today||BUSINESS_DAY;return data;}); },
@@ -517,13 +528,13 @@
     var t = props.t, C = props.C;
     var s = useAsync(function () {
       return Promise.all([api.getState(), api.getSchedule(), api.listNotes(false), api.getDates(), api.getRelationship()]);
-    }, []);
+    }, [], props.active);
     if (s.loading) return h(LoadingBlock, {t: t, C: C});
     if (s.error) return h(ErrorBlock, {t: t, C: C, error: s.error, onRetry: s.retry});
     var state = s.data[0], schedule = s.data[1], notes = s.data[2].filter(function (n) {return !n.reminded;});
     var dates = (s.data[3].dates || []).map(function (d) {return Object.assign({}, d, {left: daysUntilAnniversary(d.date)});})
       .filter(function (d) {return d.left !== null;}).sort(function (a,b) {return a.left-b.left;}).slice(0,3);
-    var plans = schedule.date === localToday() ? (schedule.plan || []).slice().sort(function(a,b) {return a.time.localeCompare(b.time);}) : [];
+    var plans = schedule.date === localToday() ? (schedule.plan || []).slice().sort(function(a,b){return String(a.time).localeCompare(String(b.time));}) : [];
     function metric(label, value, detail, key, icon) {
       return h("button", {className: "cc-metric", onClick: function () {props.navigate(key);}},
         h("span", {className: "cc-metric-icon", "aria-hidden": true}, icon),
@@ -559,7 +570,7 @@
 
   function StateTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.getState, []);
+    var s = useAsync(api.getState, [], props.active);
     var _e = useState(false), editing = _e[0], setEditing = _e[1];
     var _f = useState(null), form = _f[0], setForm = _f[1];
     var _g = useState(false), saving = _g[0], setSaving = _g[1];
@@ -584,6 +595,7 @@
     }
 
     return h("div", {},
+      h(SectionIntro,{C:C},t("stateOwnerHint")),
       h(Toolbar, {
         left: h("span", { style: { color: C.sub, fontSize: 13 } }, t("fDate") + ": " + (data.date || "—")),
         right: h(Space, { wrap: true },
@@ -663,7 +675,7 @@
 
   function CheckupTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.getCheckup, []);
+    var s = useAsync(api.getCheckup, [], props.active);
     var _b = useState(""), fixing = _b[0], setFixing = _b[1];
 
     if (s.loading) return h(LoadingBlock, { t: t, C: C });
@@ -826,8 +838,8 @@
 
   function DiaryTab(props) {
     var t = props.t, C = props.C;
-    var ls = useAsync(api.listDiary, []);
-    var st = useAsync(api.diarySettings, []);
+    var ls = useAsync(api.listDiary, [], props.active);
+    var st = useAsync(api.diarySettings, [], props.active);
     var _v = useState(null), viewing = _v[0], setViewing = _v[1];
     var _p = useState(null), preview = _p[0], setPreview = _p[1];
     var _b = useState(false), busy = _b[0], setBusy = _b[1];
@@ -854,7 +866,7 @@
             h(Switch, { size: "small", checked: !!settings.auto, disabled: busy, onChange: function (v) {
                 act(api.putDiarySettings({ auto: v, time: settings.time || "22:30" }), v ? "diaryAutoOn" : "diaryAutoOff");
               } }),
-            h(Input, { type: "time", "aria-label": t("diaryTime"), value: settings.time || "22:30", style: { width: 110 },
+            h(Input, { type: "time", "aria-label": t("diaryTime"), value: settings.time || "22:30", disabled:busy, style: { width: 110 },
               onChange: function (e) { if (/^([01]\d|2[0-3]):[0-5]\d$/.test(e.target.value)) act(api.putDiarySettings({ auto: !!settings.auto, time: e.target.value }), "saved"); } }))),
         right: h(Button, { size: "small", onClick: ls.retry }, t("refresh")),
       }),
@@ -968,7 +980,7 @@
 
   function ScheduleTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.getSchedule, []);
+    var s = useAsync(api.getSchedule, [], props.active);
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _idx = useState(null), editingIndex = _idx[0], setEditingIndex = _idx[1];
     var _f = useState({ time: "", activity: "", mood: "" }), form = _f[0], setForm = _f[1];
@@ -1047,7 +1059,7 @@
 
   function DreamsTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.listDreams, []);
+    var s = useAsync(api.listDreams, [], props.active);
     var _q = useState(""), query = _q[0], setQuery = _q[1];
     var _v = useState(null), viewing = _v[0], setViewing = _v[1];
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
@@ -1125,7 +1137,7 @@
   function NotesTab(props) {
     var t = props.t, C = props.C;
     var _x = useState(false), showExpired = _x[0], setShowExpired = _x[1];
-    var s = useAsync(function () { return api.listNotes(showExpired); }, [showExpired]);
+    var s = useAsync(function () { return api.listNotes(showExpired); }, [showExpired], props.active);
     var _q = useState(""), query = _q[0], setQuery = _q[1];
     var _p = useState(false), pending = _p[0], setPending = _p[1];
     var _id = useState(null), editingId = _id[0], setEditingId = _id[1];
@@ -1229,7 +1241,7 @@
 
   function RelationshipTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.getRelationship, []);
+    var s = useAsync(api.getRelationship, [], props.active);
     var _e = useState(false), editing = _e[0], setEditing = _e[1];
     var _f = useState(""), editNotes = _f[0], setEditNotes = _f[1];
     var _g = useState(false), saving = _g[0], setSaving = _g[1];
@@ -1302,7 +1314,7 @@
 
   function DatesTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.getDates, []);
+    var s = useAsync(api.getDates, [], props.active);
     var _q = useState(""), query = _q[0], setQuery = _q[1];
     var _m = useState(false), modalOpen = _m[0], setModalOpen = _m[1];
     var _f = useState({ name: "", date: "", note: "" }), form = _f[0], setForm = _f[1];
@@ -1390,18 +1402,18 @@
         if((config.base_url || config.model || config.api_key) && (!config.base_url || !config.model))return Promise.reject(new Error(t("setupMissingModel")));
         save=api.saveOrganizer(Object.assign({},config,{agent_id:agent||config.agent_id}));
       }
-      return save.then(function(){return api.completeSetup(name);}).then(props.onDone);
+      return save.then(function(){return api.completeSetup(name,agent);}).then(function(data){props.onDone(data,agent);});
     });}
     function next(){
       if(step===0){setStep(1);return;}
       if(step===1){
         if(!agent){setStep(2);return;}
-        act(function(){return api.bindAgent(agent,true).then(function(){setStep(2);});});
+        act(function(){return api.bindAgent(agent,true).then(function(){return Promise.all([api.organizerConfig(agent),api.getLife(agent)]);}).then(function(data){setConfig(data[0].config);setLifeOn(!!data[1].enabled);setStep(2);});});
         return;
       }
       if(step===2){setStep(3);return;}
     }
-    function toggleLife(){act(function(){return api.putLife(!lifeOn).then(function(){setLifeOn(!lifeOn);});});}
+    function toggleLife(){act(function(){return api.putLife(!lifeOn,agent).then(function(){setLifeOn(!lifeOn);});});}
     function input(label,value,onChange,password){return h("div",{style:{marginBottom:18}},h(EditorRow,{label:label,C:C},h(Input,{"aria-label":label,type:password?"password":"text",autoComplete:password?"new-password":"off",maxLength:password?4000:200,value:value,disabled:busy,onChange:function(e){onChange(e.target.value);}})));}
     function setting(key,value){setConfig(Object.assign({},config,(function(){var update={};update[key]=value;return update;})()));}
     var agents=s.data?(s.data[0].agents||[]):[];
@@ -1439,7 +1451,7 @@
 
   function TimelineTab(props) {
     var t=props.t,C=props.C;
-    var as=useState(''),agent=as[0],setAgent=as[1];
+    var as=useState(props.agentId || ''),agent=props.agentId || as[0],setAgent=props.onAgentChange || as[1];
     var ds=useState(localToday()),day=ds[0],setDay=ds[1];
     var dataState=useState(null),data=dataState[0],setData=dataState[1];
     var es=useState(''),notice=es[0],setNotice=es[1];
@@ -1457,7 +1469,7 @@
       data?h('div',null,h('p',{style:{color:C.sub}},data.shared_data_notice),
         h('h3',null,t('bfOnThisDay')),data.on_this_day.length?data.on_this_day.map(function(value){return h(Button,{key:value,onClick:function(){setDay(value);},style:{marginRight:8}},value);}):h('p',null,t('noScore')),
         h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,300px),1fr))',gap:20}},
-          h('article',null,h('h3',null,t('bfDiary')),text(data.diary),data.diary_notice?h('p',null,data.diary_notice):null),
+          h('article',null,h('h3',null,t(data.diary_source==='companion'?'pluginDiary':'bfDiary')),text(data.diary),data.host_diary&&data.companion_diary&&data.host_diary!==data.companion_diary?h('details',null,h('summary',null,t('hostDiary')),text(data.host_diary)):null,data.diary_notice?h('p',null,data.diary_notice):null),
           h('article',null,h('h3',null,t('tabDreams')),text(data.dream))),
         h('h3',null,t('tabState')),data.state?h('p',null,[data.state.mood,data.state.energy===null?'':data.state.energy+'/100',data.state.sleep,data.state.health,data.state.note].filter(Boolean).join(' · ')):h('p',null,t('bfHistoryEmpty')),
         h('h3',null,t('tabSchedule')),data.schedule&&data.schedule.plan.length?data.schedule.plan.map(function(x,i){return h('p',{key:i},x.time+' '+x.activity);}):h('p',null,t('bfHistoryEmpty')),
@@ -1475,7 +1487,7 @@
   }
 
   function MilestonesTab(props) {
-    var t=props.t,C=props.C,s=useAsync(api.getRelationship,[]);
+    var t=props.t,C=props.C,s=useAsync(api.getRelationship,[],props.active);
     if(s.loading)return h(LoadingBlock,{t:t,C:C});
     if(s.error)return h(ErrorBlock,{t:t,C:C,error:s.error,onRetry:s.retry});
     var records=(s.data.milestones||[]).filter(function(x){return isValidDate(x.date)&&typeof x.event==='string';}).slice().sort(function(a,b){return a.date.localeCompare(b.date);});
@@ -1486,7 +1498,7 @@
 
   function CareTab(props) {
     var t=props.t,C=props.C;
-    var as=useState(''),agent=as[0],setAgent=as[1];
+    var as=useState(props.agentId || ''),agent=props.agentId || as[0],setAgent=props.onAgentChange || as[1];
     var ds=useState(null),data=ds[0],setData=ds[1];
     var cs=useState(null),cfg=cs[0],setCfg=cs[1];
     var es=useState(''),notice=es[0],setNotice=es[1];
@@ -1588,7 +1600,7 @@
     var ci=useState(""),chat=ci[0],setChat=ci[1];
     var ps=useState(null),preview=ps[0],setPreview=ps[1];
     var ns=useState(""),notice=ns[0],setNotice=ns[1];
-    useEffect(function(){if(s.data){setForm(s.data[0].config);setDirty(false);}},[s.data]);
+    useEffect(function(){if(s.data){setForm(Object.assign({},s.data[0].config,{agent_id:props.agentId || s.data[0].config.agent_id}));setDirty(false);}},[s.data]);
     var agentId=form ? form.agent_id : "";
     useEffect(function(){
       var alive=true;setChats([]);setChat("");
@@ -1622,12 +1634,18 @@
       h(Toolbar,{left:h("strong",null,t("tabOrganizer")),right:h(Button,{disabled:busy,onClick:s.retry},t("orgRefresh"))}),
       h(SectionIntro,{C:C},t("orgIntro")),
       notice?h("p",{role:"status",style:{color:C.accent,whiteSpace:"pre-wrap"}},notice):null,
-      provider(form),
-      field(t("orgAgent"),h("select",{value:agentId,disabled:busy,style:selectStyle,"aria-label":t("orgAgent"),onChange:function(e){update("agent_id",e.target.value);}},
+      h("details",{style:{marginBottom:20}},h("summary",{style:{cursor:"pointer",fontWeight:600}},t("modelConnection")+" · "+(form.model || t("modelNotConfigured"))),provider(form)),
+      h("h3",null,t("organizeChat")),
+      field(t("orgAgent"),h("select",{value:agentId,disabled:busy,style:selectStyle,"aria-label":t("orgAgent"),onChange:function(e){if(props.onAgentChange){props.onAgentChange(e.target.value);return;}update("agent_id",e.target.value);}},
         h("option",{value:""},t("orgChooseAgent")),agents.filter(function(a){return a.enabled_tools && a.enabled_tools.length && a.agent_enabled!==false;}).map(function(a){return h("option",{key:a.id,value:a.id},a.name+" ("+a.id+")");}))),
       h(Button,{disabled:busy||!agentId,onClick:function(){run(function(){return api.discoverModel(agentId).then(function(data){if(!data.available){setNotice(data.reason);return;}update('base_url',data.base_url);update('model',data.model);update('api_key','');update('clear_api_key',true);setNotice(data.hint);});});}},t('discoverHost')),
       field(t("orgChat"),h("select",{value:chat,disabled:busy,style:selectStyle,"aria-label":t("orgChat"),onChange:function(e){setChat(e.target.value);setPreview(null);}},
         h("option",{value:""},t("orgChooseChat")),chats.map(function(item){return h("option",{key:item.id,value:item.id},item.name+" · "+item.updated_at);}))),
+      h("div",{className:"cc-save-bar",role:"region","aria-label":t("orgSave")},
+        h("span",{style:{flex:1,color:C.sub}},t(dirty?"orgDirty":"organizerSaveHint")),
+        h(Button,{type:dirty?"primary":"default",disabled:busy||!dirty,onClick:save},t("orgSave")),
+        h(Button,{type:dirty?"default":"primary",loading:busy,disabled:busy||dirty||!agentId||!chat,onClick:generate},t("orgPreview"))),
+      h("details",{style:{marginTop:20,marginBottom:20}},h("summary",{style:{cursor:"pointer",fontWeight:600}},t("advancedSettings")),
       h(FileBackfillPanel,{t:t,C:C,agentId:agentId,dirty:dirty,modules:['relationship','dates'].filter(function(key){return form.modules[key].enabled;}),onApplied:function(){s.retry();if(props.onApplied)props.onApplied();}}),
       number("orgMessages","recent_messages",2,200),number("orgChars","max_context_chars",1000,64000),number("orgTokens","max_output_tokens",128,4096),
       field(t("orgAuto"),h(Switch,{checked:form.auto_enabled,disabled:busy||!meta.auto_supported,onChange:function(v){update("auto_enabled",v);}})),
@@ -1640,11 +1658,7 @@
         h("div",{style:{paddingTop:16}},field(t("orgEnabled"),h(Switch,{checked:module.enabled,disabled:busy,onChange:function(v){update("enabled",v,key);}})),
           h("p",{style:{color:C.sub}},t("orgInherit")),provider(module,key),
           field(t("orgPrompt"),h(TextArea,{rows:4,value:module.prompt,disabled:busy,onChange:function(e){update("prompt",e.target.value,key);}})),
-          h("details",{},h("summary",{style:{cursor:"pointer"}},t("orgSchema")),h("pre",{style:{maxHeight:300,overflow:"auto",whiteSpace:"pre-wrap",overflowWrap:"anywhere",fontSize:12}},JSON.stringify(meta.definitions[key],null,2)))));}),
-      dirty?h("p",null,t("orgDirty")):null,
-      h("div",{style:{display:"flex",gap:10,flexWrap:"wrap",marginTop:20}},
-        h(Button,{type:"primary",disabled:busy,onClick:save},t("orgSave")),
-        h(Button,{loading:busy,disabled:busy||dirty||!agentId||!chat,onClick:generate},t("orgPreview"))),
+          h("details",{},h("summary",{style:{cursor:"pointer"}},t("orgSchema")),h("pre",{style:{maxHeight:300,overflow:"auto",whiteSpace:"pre-wrap",overflowWrap:"anywhere",fontSize:12}},JSON.stringify(meta.definitions[key],null,2)))));})),
       preview?h("div",{style:{marginTop:24}},
         h("p",null,t("orgRead")+": "+preview.message_count+" · "+t("orgRequests")+": "+preview.requests),
         h("p",null,t("orgPreviewHint")),
@@ -1660,7 +1674,7 @@
 
   function AgentsTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.agents, []);
+    var s = useAsync(api.agents, [], props.active);
     var ps = useAsync(api.profiles, []);
     var cs = useState({}), customs = cs[0], setCustoms = cs[1];
     var busyState = useState(false), busy = busyState[0], setBusy = busyState[1];
@@ -1693,7 +1707,7 @@
               onChange:function(e){
                 var map=Object.assign({},(ps.data&&ps.data.map)||{});
                 map[agent.id]=e.target.value;
-                api.putProfiles(map).then(function(){message.success(t("profileSaved"));ps.retry();})
+                api.putProfiles(map).then(function(){message.success(t("profileSaved"));ps.retry();if(props.onProfileChanged)props.onProfileChanged();})
                   .catch(function(er){message.error(er.message);});
               }},
               h("option",{value:"shared"},t("profileShared")),
@@ -1707,7 +1721,7 @@
               if(!v){message.warning(t("profileCustom"));return;}
               var map=Object.assign({},(ps.data&&ps.data.map)||{});
               map[agent.id]=v;
-              api.putProfiles(map).then(function(){message.success(t("profileSaved"));ps.retry();})
+              api.putProfiles(map).then(function(){message.success(t("profileSaved"));ps.retry();if(props.onProfileChanged)props.onProfileChanged();})
                 .catch(function(er){message.error(er.message);});
             }},t("save"))),
           h("p",{style:{color:C.sub,fontSize:12}},t("profileHint")),
@@ -1725,16 +1739,17 @@
 
   function DataTab(props) {
     var t = props.t, C = props.C;
-    var s = useAsync(api.health, []);
+    var s = useAsync(api.health, [], props.active);
     var _b = useState(false), exporting = _b[0], setExporting = _b[1];
     var _i = useState(false), importing = _i[0], setImporting = _i[1];
     var fileRef = React.useRef(null);
+    var privateState=useState(false), privateBackup=privateState[0], setPrivateBackup=privateState[1];
     var healthData = s.data;
 
     function doExport() {
       if (exporting) return;
       setExporting(true);
-      api.exportAll()
+      (privateBackup ? api.exportPrivate() : api.exportAll())
         .then(function (data) {
           var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           var url = URL.createObjectURL(blob);
@@ -1761,6 +1776,7 @@
             .then(function (res) {
               var fields = (res && res.imported) ? res.imported.join(", ") : "";
               message.success(t("importSuccess", { fields: fields }));
+              if(res.notice)message.info(res.notice);
               s.retry();
               if (props.onImport) props.onImport();
             })
@@ -1810,6 +1826,8 @@
           h("div", { style: { padding: 16, borderRadius: 8, border: C.border } },
             h("div", { style: { fontWeight: 500, color: C.text, marginBottom: 6 } }, t("exportData")),
             h("div", { style: { color: C.sub, fontSize: 13, marginBottom: 12 } }, t("exportDesc")),
+            h("label",{style:{display:"block",marginBottom:12}},h("input",{type:"checkbox",checked:privateBackup,onChange:function(e){setPrivateBackup(e.target.checked);}})," "+t("privateBackup")),
+            privateBackup?h("p",{style:{color:C.sub}},t("privateBackupHint")):null,
             h(Button, { type: "primary", onClick: doExport, loading: exporting, disabled: busy }, t("exportData"))),
           h("div", { style: { padding: 16, borderRadius: 8, border: C.border } },
             h("div", { style: { fontWeight: 500, color: C.text, marginBottom: 6 } }, t("importData")),
@@ -1829,7 +1847,7 @@
 .cc-eyebrow{font-size:11px;letter-spacing:.12em;color:var(--cc-sub);font-weight:600}.cc-hero h1{margin:12px 0 8px;font-size:30px;letter-spacing:-.04em;line-height:1.3}.cc-version{font-size:11px;letter-spacing:0;font-weight:400;color:var(--cc-sub);margin-left:12px}.cc-hero p{margin:0;color:var(--cc-sub);font-size:14px}.cc-today{text-align:right;max-width:260px}.cc-today>span{display:block;font-variant-numeric:tabular-nums;font-size:22px;font-weight:600}.cc-today small{display:block;margin-top:8px;color:var(--cc-sub);line-height:1.7}
 .cc-tabs>.ant-tabs-nav{margin-bottom:24px}.cc-tabs .ant-tabs-tab{padding:12px 4px;font-size:14px}.cc-tabs .ant-tabs-ink-bar{background:var(--cc-accent)}.cc-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn{color:var(--cc-accent)}
 .cc-tabs>.qwenpaw-tabs-nav{margin-bottom:24px}.cc-tabs .qwenpaw-tabs-tab{padding:12px 4px;font-size:14px}.cc-tabs .qwenpaw-tabs-ink-bar{background:var(--cc-accent)}.cc-tabs .qwenpaw-tabs-tab.qwenpaw-tabs-tab-active .qwenpaw-tabs-tab-btn{color:var(--cc-accent)}
-.cc-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}.cc-metric{text-align:left;display:flex;flex-direction:column;position:relative;gap:12px;padding:22px 20px;background:var(--cc-card);color:var(--cc-text);border:1px solid rgba(127,127,127,.14);border-radius:18px;cursor:pointer;min-width:0;font:inherit;transition:transform .18s,border-color .18s}.cc-metric:hover{transform:translateY(-3px);border-color:var(--cc-accent)}.cc-metric:focus-visible{outline:2px solid var(--cc-accent);outline-offset:3px}.cc-metric strong{font-size:25px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}.cc-metric-icon{position:absolute;right:18px;top:16px;font-size:22px;color:var(--cc-accent)}.cc-metric .cc-eyebrow{padding-right:22px;letter-spacing:0}.cc-metric-detail{font-size:12px;color:var(--cc-sub);line-height:1.6;overflow-wrap:anywhere}.cc-overview-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px}.cc-timeline-row{display:flex;gap:20px;padding:15px 0;border-bottom:1px solid rgba(127,127,127,.1);overflow-wrap:anywhere}.cc-timeline-row time{font-variant-numeric:tabular-nums;color:var(--cc-accent);font-weight:600;flex-shrink:0}.cc-date-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid rgba(127,127,127,.1)}.cc-date-row small{display:block;color:var(--cc-sub);margin-top:5px}.cc-note-preview{padding:14px 16px;background:rgba(236,72,153,.04);border-left:3px solid var(--cc-accent);border-radius:4px 10px 10px 4px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.cc-search-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.cc-app .ant-btn{border-radius:8px}.cc-app .ant-input,.cc-app .ant-input-affix-wrapper{border-radius:8px}.cc-app section{min-width:0}.cc-app .ant-tabs-content-holder{min-width:0}
+.cc-save-bar{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px;background:var(--cc-card);border:1px solid rgba(127,127,127,.2);border-radius:10px}.cc-context{padding:12px 16px;margin-bottom:16px;border:1px solid rgba(127,127,127,.15);border-radius:10px;overflow-wrap:anywhere}.cc-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}.cc-metric{text-align:left;display:flex;flex-direction:column;position:relative;gap:12px;padding:22px 20px;background:var(--cc-card);color:var(--cc-text);border:1px solid rgba(127,127,127,.14);border-radius:18px;cursor:pointer;min-width:0;font:inherit;transition:transform .18s,border-color .18s}.cc-metric:hover{transform:translateY(-3px);border-color:var(--cc-accent)}.cc-metric:focus-visible{outline:2px solid var(--cc-accent);outline-offset:3px}.cc-metric strong{font-size:25px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}.cc-metric-icon{position:absolute;right:18px;top:16px;font-size:22px;color:var(--cc-accent)}.cc-metric .cc-eyebrow{padding-right:22px;letter-spacing:0}.cc-metric-detail{font-size:12px;color:var(--cc-sub);line-height:1.6;overflow-wrap:anywhere}.cc-overview-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px}.cc-timeline-row{display:flex;gap:20px;padding:15px 0;border-bottom:1px solid rgba(127,127,127,.1);overflow-wrap:anywhere}.cc-timeline-row time{font-variant-numeric:tabular-nums;color:var(--cc-accent);font-weight:600;flex-shrink:0}.cc-date-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid rgba(127,127,127,.1)}.cc-date-row small{display:block;color:var(--cc-sub);margin-top:5px}.cc-note-preview{padding:14px 16px;background:rgba(236,72,153,.04);border-left:3px solid var(--cc-accent);border-radius:4px 10px 10px 4px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.cc-search-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.cc-app .ant-btn{border-radius:8px}.cc-app .ant-input,.cc-app .ant-input-affix-wrapper{border-radius:8px}.cc-app section{min-width:0}.cc-app .ant-tabs-content-holder{min-width:0}
 @media(max-width:760px){.cc-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.cc-overview-grid{grid-template-columns:1fr}.cc-hero{padding:24px}.cc-today{display:none}.cc-hero h1{font-size:26px}.cc-app{padding-top:16px}.cc-app .ant-space{flex-wrap:wrap}.cc-app .ant-tabs-tab+.ant-tabs-tab{margin-left:20px}}
 .cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap{overflow:visible}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.ant-tabs-nav .ant-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.ant-tabs-nav .ant-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-operations,.cc-tabs>.ant-tabs-nav .ant-tabs-ink-bar{display:none}.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:before,.cc-tabs>.ant-tabs-nav .ant-tabs-nav-wrap:after{display:none}
 .cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-wrap{overflow:visible}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-list{transform:none!important;flex-wrap:wrap;gap:4px 6px;width:100%}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-tab{margin:0!important;padding:8px 10px;border-radius:8px;font-size:13px}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-tab-active{background:rgba(236,72,153,.08)}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-operations,.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-ink-bar{display:none}.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-wrap:before,.cc-tabs>.qwenpaw-tabs-nav .qwenpaw-tabs-nav-wrap:after{display:none}
@@ -1859,7 +1877,36 @@
       h(ProjectLink,{href:"https://github.com/menglimi/astrbot_plugin_private_companion",label:"astrbot_plugin_private_companion"}));
   }
 
+  function RecordContext(props) {
+    var agent = props.agent;
+    var s = useAsync(function(){return api.profiles();},[agent,props.active,props.revision]);
+    var agents = useAsync(api.agents,[]);
+    var options = agents.data && agents.data.agents || [];
+    var profile = s.data && ((s.data.map || {})[agent] || "shared");
+    return h("aside",{className:"cc-context",style:{color:props.C.sub},"aria-live":"polite"},
+      h("div",{style:{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}},
+        h("strong",null,props.t("currentAgent")+": "+(agent || props.t("sharedContext"))),
+        h("select",{"aria-label":props.t("scopeChoose"),value:props.choice,onChange:function(e){props.onSelect(e.target.value);},
+          style:{maxWidth:"100%",padding:6,borderRadius:6,background:props.C.cardBg,color:props.C.text,border:props.C.border}},
+          h("option",{value:"@host"},props.t("scopeHost")),
+          options.map(function(a){return h("option",{key:a.id,value:a.id},a.name+" ("+a.id+")");}),
+          props.choice!=="@host"&&!options.some(function(a){return a.id===props.choice;})?h("option",{value:props.choice},props.choice):null)),
+      h("span",null," · "+props.t("profileLabel")+": "+(s.error ? props.t("contextUnavailable") : profile || "…")),
+      h("div",{style:{fontSize:12,marginTop:6}},props.t("contextHint")+" "+props.t("scopeSwitchHint")));
+  }
+
   function CompanionApp() {
+    var scopeState=useState(selectedAgentId()), agentScope=scopeState[0], setAgentScope=scopeState[1];
+    VIEW_AGENT = agentScope;
+    var profileRevisionState=useState(0), profileRevision=profileRevisionState[0], setProfileRevision=profileRevisionState[1];
+    var followHost=React.useRef(true);
+    var choiceState=useState("@host"), scopeChoice=choiceState[0], setScopeChoice=choiceState[1];
+    function selectScope(value){followHost.current=value==="@host";setScopeChoice(value);setAgentScope(value==="@host"?selectedAgentId():value);}
+    useEffect(function(){
+      if (typeof host.getSelectedAgentId !== "function" || !window.setInterval) return;
+      var timer=window.setInterval(function(){if(followHost.current)setAgentScope(selectedAgentId());},1000);
+      return function(){window.clearInterval(timer);};
+    },[]);
     var careSuggestionState=useState(null),careSuggestion=careSuggestionState[0],setCareSuggestion=careSuggestionState[1];
     var _tab = useState("overview"), activeTab = _tab[0], setActiveTab = _tab[1];
     function navigate(key) { setActiveTab(key); }
@@ -1904,6 +1951,7 @@
     var versionState = useState(APP_VERSION), version = versionState[0], setVersion = versionState[1];
     useEffect(function () {
       var active = true;
+      setCareSuggestion(null);
       api.setup().then(function(data){if(active){setSetupData(data);setSetupOpen(!data.completed);}})
         .catch(function(error){console.warn("[companion-core] setup failed",error);});
       api.health().then(function (data) {
@@ -1911,7 +1959,7 @@
         if (active) setVersion(APP_VERSION);
       }).catch(function (error) { console.warn("[companion-core] health failed", error); });
       return function () { active = false; };
-    }, []);
+    }, [agentScope]);
     var locale = normalizeLocale(useHostLocale());
     var themeInfo = useHostTheme();
     var isDark = !!(themeInfo && themeInfo.isDark);
@@ -1921,7 +1969,7 @@
 
     return h("div", {className:"cc-app", "data-theme":isDark ? "dark" : "light", style:{"--cc-text":C.text,"--cc-sub":C.sub,"--cc-card":C.cardBg,"--cc-bg":C.pageBg,"--cc-accent":C.accent}},
       h("style",null,APP_CSS),
-      setupOpen?h(SetupWizard,{t:t,C:C,setup:setupData,onDone:function(data){setSetupData(data);setSetupOpen(false);setRevision(function(v){return v+1;});}}):null,
+      setupOpen?h(SetupWizard,{t:t,C:C,setup:setupData,onDone:function(data,agent){if(agent)selectScope(agent);setSetupData(data);setSetupOpen(false);setRevision(function(v){return v+1;});}}):null,
       h("header",{className:"cc-hero"},
         h("div",{className:"cc-hero-copy"}, h("div",{className:"cc-eyebrow"},"♡  " + t("todayLabel")),
           h("h1",null,t("appTitle"),h("span",{className:"cc-version"},version ? "v"+version : "")),
@@ -1941,25 +1989,26 @@
                 {key:"setup",label:t("setupOpen"),onClick:function(){setSetupOpen(true);}},
                 {key:"github",label:"GitHub",onClick:function(){if(typeof window!=="undefined"&&window.open)window.open(PROJECT_URL,"_blank");}}])
           }},h(Button,{size:"small"},"⋯ "+t("navMore"))):null))),
+      h(RecordContext,{key:"context:"+agentScope+":"+profileRevision,revision:profileRevision,agent:agentScope,choice:scopeChoice,onSelect:selectScope,t:t,C:C,active:activeTab}),
       h(Tabs, {
-        className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
-        destroyInactiveTabPane:true,
+        key:"tabs:"+agentScope+":"+profileRevision, className: "cc-tabs", activeKey:activeTab, onChange:setActiveTab,
+        destroyInactiveTabPane:false,
         items: [
-          {key:"overview",label:"◈ " + t("tabOverview"),children:h(OverviewTab,{key:revision,t:t,C:C,navigate:setActiveTab})},
-          { key: "state", label: "🌤 " + t("tabState"), children: h(StateTab, { key:revision, t: t, C: C }) },
-          { key: "schedule", label: "📅 " + t("tabSchedule"), children: h(ScheduleTab, { key:revision, t: t, C: C }) },
-          { key: "dreams", label: "💭 " + t("tabDreams"), children: h(DreamsTab, { key:revision, t: t, C: C }) },
-          { key: "diary", label: "📔 " + t("tabDiary"), children: h(DiaryTab, { t: t, C: C }) },
-          { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { key:revision, t: t, C: C }) },
-          { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { key:revision, t: t, C: C }) },
-          { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { key:revision, t: t, C: C, onCare:function(item){setCareSuggestion(item);setActiveTab("care");} }) },
-          { key: "organizer", label: "✨ " + t("tabOrganizer"), children: h(OrganizerTab, { t:t, C:C, onApplied:function(){setRevision(function(v){return v+1;});api.setup().then(setSetupData).catch(function(error){console.warn("[companion-core] setup refresh failed",error);});} }) },
-          { key: "agents", label: "🤖 " + t("tabAgents"), children: h(AgentsTab, { t:t, C:C }) },
-          { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
-          {key:'timeline',label:'📖 '+t('tabTimeline'),children:h(TimelineTab,{t:t,C:C,revision:revision,onApplied:function(){setRevision(function(v){return v+1;});}})},
-          {key:'milestones',label:'💕 '+t('bfMilestones'),children:h(MilestonesTab,{t:t,C:C,navigate:setActiveTab})},
-          {key:'care',label:'📣 '+t('tabCare'),children:h(CareTab,{t:t,C:C,suggestion:careSuggestion})},
-          {key:'checkup',label:'🩺 '+t('tabCheckup'),children:h(CheckupTab,{t:t,C:C,navigate:setActiveTab})},
+          {key:"overview",label:"◈ " + t("tabOverview"),children:h(OverviewTab,{key:revision,t:t,C:C,active:activeTab==="overview",navigate:setActiveTab})},
+          { key: "state", label: "🌤 " + t("tabState"), children: h(StateTab, { active:activeTab==="state", key:revision, t: t, C: C }) },
+          { key: "schedule", label: "📅 " + t("tabSchedule"), children: h(ScheduleTab, { active:activeTab==="schedule", key:revision, t: t, C: C }) },
+          { key: "dreams", label: "💭 " + t("tabDreams"), children: h(DreamsTab, { active:activeTab==="dreams", key:revision, t: t, C: C }) },
+          { key: "diary", label: "📔 " + t("tabDiary"), children: h(DiaryTab, { active:activeTab==="diary", t: t, C: C }) },
+          { key: "notes", label: "📝 " + t("tabNotes"), children: h(NotesTab, { active:activeTab==="notes", key:revision, t: t, C: C }) },
+          { key: "relationship", label: "💕 " + t("tabRelationship"), children: h(RelationshipTab, { active:activeTab==="relationship", key:revision, t: t, C: C }) },
+          { key: "dates", label: "🎂 " + t("tabDates"), children: h(DatesTab, { active:activeTab==="dates", key:revision, t: t, C: C, onCare:function(item){setCareSuggestion(item);setActiveTab("care");} }) },
+          { key: "organizer", label: "✨ " + t("tabOrganizer"), children: h(OrganizerTab, { agentId:agentScope,onAgentChange:selectScope,t:t, C:C, onApplied:function(){setRevision(function(v){return v+1;});api.setup().then(setSetupData).catch(function(error){console.warn("[companion-core] setup refresh failed",error);});} }) },
+          { key: "agents", label: "🤖 " + t("tabAgents"), children: h(AgentsTab, { onProfileChanged:function(){setProfileRevision(function(v){return v+1;});},active:activeTab==="agents", t:t, C:C }) },
+          { key: "data", label: "💾 " + t("tabData"), children: h(DataTab, { active:activeTab==="data", t:t, C:C, onImport:function(){setRevision(function(v){return v+1;});} }) },
+          {key:'timeline',label:'📖 '+t('tabTimeline'),children:h(TimelineTab,{agentId:agentScope,onAgentChange:selectScope,t:t,C:C,revision:revision,onApplied:function(){setRevision(function(v){return v+1;});}})},
+          {key:'milestones',label:'💕 '+t('bfMilestones'),children:h(MilestonesTab,{active:activeTab==="milestones",t:t,C:C,navigate:setActiveTab})},
+          {key:'care',label:'📣 '+t('tabCare'),children:h(CareTab,{agentId:agentScope,onAgentChange:selectScope,t:t,C:C,suggestion:careSuggestion})},
+          {key:'checkup',label:'🩺 '+t('tabCheckup'),children:h(CheckupTab,{active:activeTab==="checkup",t:t,C:C,navigate:setActiveTab})},
           { key:"about", label:"ⓘ " + t("tabAbout"), children:h(AboutTab,{t:t,version:version}) },
         ].filter(function(it){return !navCollapsed||hiddenTabs.indexOf(it.key)<0||it.key===activeTab;}),
       }),

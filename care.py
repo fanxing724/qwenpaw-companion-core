@@ -1,4 +1,8 @@
-"""Opt-in care: public host scheduling, durable queues and accepted-channel delivery."""
+"""Opt-in care: public host scheduling, durable queues and accepted-channel delivery.
+
+AI 主动陪伴的执行层：根据它记住的事项和关系线索关怀用户。
+调度、首见上下文、模型措辞、渠道投递是不同阶段；设计边界见 DESIGN.md。
+"""
 import asyncio
 from datetime import date, datetime
 import hashlib
@@ -68,6 +72,7 @@ class Followup(BaseModel):
 class Care:
     def __init__(self,owner,features):
         self.o,self.c,self.features=owner,owner.c,features
+        self.c["CareSettings"] = CareSettings
         self.path=self.c['_DATA_DIR']/'care-state.json'
         self.lock=threading.RLock()
         self.send_lock=asyncio.Lock()
@@ -354,7 +359,8 @@ class Care:
                         agent.update(model_date=today,model_attempts=attempts+1);self.write(state)
                 if allowed:
                     try:
-                        value,_=await asyncio.to_thread(self.o.complete,provider,plan['messages'],384)
+                        value,usage=await asyncio.to_thread(self.o.complete,provider,plan['messages'],384)
+                        self.c['_record_usage']('care',usage)
                         greeting=value.get('greeting') if isinstance(value,dict) and set(value)=={'greeting'} else None
                         if isinstance(greeting,str) and 0<len(greeting.strip())<=120 and '[已脱敏]' not in greeting:
                             text=greeting.strip()+'\n'+text
@@ -475,8 +481,8 @@ class Care:
         owner=self
         class Tick(HookBase):
             phase=Phase.PRE_DISPATCH;name='companion_care_tick';priority=1
+            @owner.c['_profiled_hook']
             async def run(self,ctx):
-                owner.c['_use_profile'](ctx.agent_id)
                 cfg=owner.settings(ctx.agent_id)
                 token=getattr(ctx.request,'companion_care_token',None)
                 context=getattr(ctx.request,'request_context',None) or {}
@@ -488,14 +494,17 @@ class Care:
                 return HookResult()
         class Before(HookBase):
             phase=Phase.PRE_EXECUTE;name='companion_first_seen';priority=200
+            @owner.c['_profiled_hook']
             async def run(self,ctx):
                 await owner.first_before(ctx);return HookResult()
         class After(HookBase):
             phase=Phase.POST_RESPONSE;name='companion_first_seen_commit';priority=115
+            @owner.c['_profiled_hook']
             async def run(self,ctx):
                 await owner.first_after(ctx);return HookResult()
         class Cleanup(HookBase):
             phase=Phase.FINALLY;name='companion_first_seen_release';priority=200
+            @owner.c['_profiled_hook']
             async def run(self,ctx):owner.release(ctx);return HookResult()
         for hook in [Tick(),Before(),After(),Cleanup()]:app.runtime_hook(hook)
         self.hooks_supported=True
