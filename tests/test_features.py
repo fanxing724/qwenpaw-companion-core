@@ -605,6 +605,8 @@ def test_interaction_logging_feeds_explainable_score_and_clamps(loaded,monkeypat
     module,client,root,sdk=loaded
     prefix='/api/companion-core' if sdk else '/api/plugins/companion-core'
     monkeypatch.setattr(module,'_today_str',lambda:'2026-10-17')
+    # score_plan 的"近 7 天"窗口用 _now 计算；时钟必须一起钉死，否则随真实日期推移必挂
+    monkeypatch.setattr(module,'_now',lambda:datetime(2026,10,17,12,0,tzinfo=module._TIMEZONE))
     module._log_interaction('tool_call','alice')
     module._log_interaction('tool_call','alice')
     module._log_interaction('care_delivery','alice')
