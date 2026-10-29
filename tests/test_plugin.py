@@ -340,6 +340,42 @@ def test_organizer_bounded_text_and_upserts(organizer_host):
         organizer.prepare('dreams',[{'date':'../../outside','content':'bad'}],[])
 
 
+def test_organizer_dreams_append_never_replaces_day(organizer_host):
+    """聊天整理对梦境只追加不整日替换；标题保留；去重；超大聚合不再拖垮整理（回归 P1-BUG-02）。"""
+    module, client, sdk, prefix, organizer, _, _, _ = organizer_host
+    assert client.post(prefix+'/dreams', json={'date':'2026-10-20','content':'梦见旧梦一：站在海边'}).status_code == 200
+    assert client.post(prefix+'/dreams', json={'date':'2026-10-20','content':'梦见旧梦二：在图书馆'}).status_code == 200
+    before = organizer.snapshot()
+    after = organizer.prepare('dreams', [{'date':'2026-10-20','content':'梦见新梦：一条会说话的鱼'}], before['dreams'])
+    day = next(d for d in after if d['date'] == '2026-10-20')
+    # 旧段全部幸存，新片段以分隔符追加
+    assert '站在海边' in day['content'] and '图书馆' in day['content'] and '会说话的鱼' in day['content']
+    assert day['content'].count('\n\n---\n\n') == 2
+    # 重复片段 → 去重跳过；无正文条目 → 宽容跳过；缺日期 → 仍报错
+    assert organizer.prepare('dreams', [{'date':'2026-10-20','content':'梦见新梦：一条会说话的鱼'}], after) == after
+    assert organizer.prepare('dreams', [{'date':'2026-10-20'}], after) == after
+    with pytest.raises(ValueError):
+        organizer.prepare('dreams', [{'content':'没有日期'}], after)
+    # 写入落盘：标题保留、旧段不丢
+    organizer.write_unlocked({'dreams': after})
+    text = (module._DATA_DIR/'dreams'/'2026-10-20.md').read_text(encoding='utf-8')
+    assert text.startswith('# 2026-10-20 的梦')
+    assert '站在海边' in text and '图书馆' in text and '会说话的鱼' in text
+    # 超过 2000 字的聚合文件可以继续整理追加（旧版此处 ValidationError → 整轮 422）
+    big = '# 2026-10-22 的梦\n\n' + '字' * 2100
+    (module._DATA_DIR/'dreams'/'2026-10-22.md').write_text(big, encoding='utf-8')
+    merged = organizer.prepare('dreams', [{'date':'2026-10-22','content':'追加的新片段'}], organizer.snapshot()['dreams'])
+    day2 = next(d for d in merged if d['date'] == '2026-10-22')
+    assert day2['content'].startswith('# 2026-10-22 的梦') and day2['content'].endswith('追加的新片段')
+    assert len(day2['content']) > 2000
+    # 无标题的存量文件：整理时补回标题，旧内容保留
+    (module._DATA_DIR/'dreams'/'2026-10-23.md').write_text('裸片段', encoding='utf-8')
+    merged3 = organizer.prepare('dreams', [{'date':'2026-10-23','content':'新片段'}], organizer.snapshot()['dreams'])
+    organizer.write_unlocked({'dreams': merged3})
+    text3 = (module._DATA_DIR/'dreams'/'2026-10-23.md').read_text(encoding='utf-8')
+    assert text3.startswith('# 2026-10-23 的梦') and '裸片段' in text3 and '新片段' in text3
+
+
 def test_organizer_auto_hook_cooldown_dedup_and_stop(organizer_host, monkeypatch):
     import asyncio
     from types import SimpleNamespace as NS
@@ -447,7 +483,7 @@ def test_organizer_six_modules_validate_before_any_write(organizer_host, monkeyp
     after=organizer.snapshot()
     assert after['state']['mood']=='开心'
     assert after['schedule']['plan'][0]['activity']=='读书'
-    assert after['dreams'][0]['content']=='梦见了森林'
+    assert after['dreams'][0]['content']=='# 2026-10-15 的梦\n\n梦见了森林'  # write_unlocked 统一补标题
     assert any(note['content']=='记得喝水' for note in after['notes'])
     assert any(item['name']=='纪念日' for item in after['dates'])
 
@@ -498,6 +534,51 @@ def test_dream_calendar_validation(loaded, value, status):
     module, client, data, sdk = loaded
     prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
     assert client.get(prefix + '/dreams/' + value).status_code == status
+
+
+def test_dream_aggregate_reads_and_file_limits(loaded):
+    """同日多段梦境：列表/详情/导出三条读路径 + 单文件累计上限（回归 P1-BUG-01）。"""
+    module, client, data, sdk = loaded
+    prefix = '/api/companion-core' if sdk else '/api/plugins/companion-core'
+    frag = '字' * 1500
+    assert client.post(prefix+'/dreams', json={'date':'2026-10-20','content':frag}).status_code == 200
+    assert client.post(prefix+'/dreams', json={'date':'2026-10-20','content':frag}).status_code == 200
+    path = data/'dreams'/'2026-10-20.md'
+    assert path.stat().st_size > 2000
+    # 详情：聚合全文完整可读（旧版此处 response_model 校验超限 → 500）
+    detail = client.get(prefix+'/dreams/2026-10-20')
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body['content'].startswith('# 2026-10-20 的梦')
+    assert body['content'].count(frag) == 2 and '\n\n---\n\n' in body['content']
+    # 列表：截断预览仍可用
+    listing = client.get(prefix+'/dreams').json()
+    assert listing[0]['date'] == '2026-10-20' and len(listing[0]['content']) == 500
+    # 导出：无损
+    exported = client.get(prefix+'/export').json()
+    assert any(d['date'] == '2026-10-20' and d['content'].count(frag) == 2 for d in exported['dreams'])
+    # 单段恰好 2000 字：加标题落盘后超过单段上限，详情仍须可读（旧版必 500）
+    assert client.post(prefix+'/dreams', json={'date':'2026-10-21','content':'梦'*2000}).status_code == 200
+    assert client.get(prefix+'/dreams/2026-10-21').status_code == 200
+    for i in range(3):
+        assert client.post(prefix+'/dreams', json={'date':'2026-10-21','content':f'第{i}段补充'}).status_code == 200
+    assert client.get(prefix+'/dreams/2026-10-21').status_code == 200
+    # 累计上限：逼近 256KiB 后继续追加 → 409，文件保持原样
+    day = '2026-10-22'
+    cap_path = data/'dreams'/f'{day}.md'
+    head = f'# {day} 的梦\n\n'
+    filler = '旧' * ((module._DREAM_FILE_MAX_BYTES - len(head.encode('utf-8'))) // 3)
+    cap_path.write_text(head + filler, encoding='utf-8')
+    assert cap_path.stat().st_size <= module._DREAM_FILE_MAX_BYTES
+    before_bytes = cap_path.read_bytes()
+    assert client.post(prefix+'/dreams', json={'date':day,'content':'新片段'}).status_code == 409
+    assert cap_path.read_bytes() == before_bytes
+    # 超限存量文件：详情 413，列表/导出仍可用
+    cap_path.write_text('巨' * (module._DREAM_FILE_MAX_BYTES // 3 + 10), encoding='utf-8')
+    assert cap_path.stat().st_size > module._DREAM_FILE_MAX_BYTES
+    assert client.get(prefix+f'/dreams/{day}').status_code == 413
+    assert client.get(prefix+'/dreams').status_code == 200
+    assert client.get(prefix+'/export').status_code == 200
 
 
 def test_timezone_boundary_and_health(loaded, monkeypatch):

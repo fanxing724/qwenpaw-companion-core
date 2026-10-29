@@ -309,6 +309,17 @@ class DreamModel(BaseModel):
     _valid_date = field_validator("date")(_validate_date)
 
 
+# 梦境聚合文件安全上限：详情读取与追加写入共用，防止单文件无界增长。
+_DREAM_FILE_MAX_BYTES = 256 * 1024
+
+
+class DreamDetailModel(BaseModel):
+    """梦境读取模型：文件是同日多段的聚合，长度只受文件大小上限约束（单段录入上限仍由 DreamModel 负责）。"""
+
+    date: str = ""
+    content: str = ""
+
+
 class NoteModel(BaseModel):
     id: str = ""
     content: str = Field(default="", max_length=500)
@@ -645,9 +656,9 @@ def update_schedule(schedule: ScheduleModel):
 
 # ==================== 梦境 ====================
 
-@router.get("/dreams", response_model=list[DreamModel])
+@router.get("/dreams", response_model=list[DreamDetailModel])
 def list_dreams():
-    """列出所有梦境碎片。"""
+    """列出所有梦境碎片（正文为首 500 字预览）。"""
     dreams_dir = _DATA_DIR / "dreams"
     if not dreams_dir.exists():
         return []
@@ -655,16 +666,18 @@ def list_dreams():
     for f in sorted(dreams_dir.glob("*.md"), reverse=True):
         dream_date = f.stem
         try:
-            content = f.read_text(encoding="utf-8").strip()
+            # 只读预览所需长度，超限的存量文件不拖垮列表接口。
+            with f.open(encoding="utf-8") as fh:
+                content = fh.read(600).strip()
         except Exception:  # noqa: BLE001
             content = ""
-        results.append(DreamModel(date=dream_date, content=content[:500]))
+        results.append(DreamDetailModel(date=dream_date, content=content[:500]))
     return results
 
 
-@router.get("/dreams/{dream_date}", response_model=DreamModel)
+@router.get("/dreams/{dream_date}", response_model=DreamDetailModel)
 def get_dream(dream_date: str):
-    """获取指定日期的梦境。"""
+    """获取指定日期的梦境（同日多段的聚合全文）。"""
     try:
         _validate_date(dream_date)
     except ValueError as exc:
@@ -672,13 +685,15 @@ def get_dream(dream_date: str):
     path = _DATA_DIR / "dreams" / f"{dream_date}.md"
     if not path.exists():
         raise HTTPException(404, f"没有 {dream_date} 的梦境记录")
-    return DreamModel(
+    if path.stat().st_size > _DREAM_FILE_MAX_BYTES:
+        raise HTTPException(413, "梦境文件超过安全上限，请按日期拆分后处理；列表与导出不受影响")
+    return DreamDetailModel(
         date=dream_date,
         content=path.read_text(encoding="utf-8").strip(),
     )
 
 
-@router.post("/dreams", response_model=DreamModel)
+@router.post("/dreams", response_model=DreamDetailModel)
 def create_dream(dream: DreamModel):
     """创建梦境碎片。"""
     dream_date = dream.date or _today_str()
@@ -694,6 +709,8 @@ def create_dream(dream: DreamModel):
             new_content = f"{existing}\n\n---\n\n{dream.content.strip()}"
         else:
             new_content = f"# {dream_date} 的梦\n\n{dream.content.strip()}"
+        if len(new_content.encode("utf-8")) > _DREAM_FILE_MAX_BYTES:
+            raise HTTPException(409, "当日梦境已达累计上限，请换日期记录或先精简当日内容")
         _write_text(path, new_content)
 
         state_path = _DATA_DIR / "state.yaml"
@@ -702,7 +719,7 @@ def create_dream(dream: DreamModel):
             state["dream"] = dream.content[:80]
             _write_yaml(state_path, state)
 
-    return DreamModel(date=dream_date, content=dream.content)
+    return DreamDetailModel(date=dream_date, content=dream.content)
 
 
 # ==================== 便签 ====================

@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 MODULES = {
     'state': 'AI 自身状态：根据 AI 明确表达或用户明确设定的 AI 状态更新心情、精力、睡眠等。',
     'schedule': 'AI 自身日程：仅提取 AI 的明确作息与活动安排；没有新安排时不修改原计划。',
-    'dreams': 'AI 梦境：仅记录 AI 明确讲述的梦境，创作须明确标注。',
+    'dreams': 'AI 梦境：仅记录 AI 明确讲述的梦境，创作须明确标注。只输出本次新增的梦境片段（content 为单段正文），不要回显或改写既有内容，系统会按日期自动追加。',
     'notes': '便签：提取明确要求记住的事情和待办，不重复已有便签。',
     'relationship': '关系：根据明确的互动更新关系描述或里程碑，亲密度仅小幅合理调整。',
     'dates': '重要日期：仅记录明确的生日、纪念日等；日期不完整时不猜测。',
@@ -342,11 +342,34 @@ class ChatOrganizer:
                 if any(note['content'] == item.get('content') for note in records):
                     continue
                 item.update(id=uuid4().hex, created_at=c['_now_ts']())
+            if key == 'dreams':
+                # 追加语义：梦境按日期聚合，"更新"只允许追加新片段，禁止整日替换（防旧梦静默丢失）。
+                parsed = model.model_validate(item).model_dump()
+                if not parsed['date']:
+                    raise ValueError('缺少标识或内容')
+                fragment = parsed['content'].strip()
+                if not fragment:
+                    continue  # 宽容：没有正文的条目视为无新增
+                previous = next((row for row in records if row['date'] == parsed['date']), None)
+                title = f"# {parsed['date']} 的梦"
+                if previous is None:
+                    records.append({'date': parsed['date'], 'content': fragment})
+                    continue
+                aggregate = previous['content'].strip()
+                if not aggregate.startswith(title):
+                    aggregate = f'{title}\n\n{aggregate}'
+                if fragment in aggregate:
+                    continue  # 去重：同一片段被多轮整理重复提取
+                merged = f'{aggregate}\n\n---\n\n{fragment}'
+                if len(merged.encode('utf-8')) > c['_DREAM_FILE_MAX_BYTES']:
+                    continue  # 超过单文件安全上限：跳过追加，保持既有内容可读
+                previous['content'] = merged
+                continue
             previous = next((row for row in records if row.get(identity) == item.get(identity)), {})
             if key == 'notes' and item.get('id') and not previous and 'created_at' not in item:
                 raise ValueError('更新便签 ID 不存在；新便签请省略 id')
             parsed = model.model_validate({**previous, **item}).model_dump()
-            if not parsed.get(identity) or (key in {'notes','dreams'} and not parsed['content'].strip()):
+            if not parsed.get(identity) or (key == 'notes' and not parsed['content'].strip()):
                 raise ValueError('缺少标识或内容')
             if previous:
                 records[records.index(previous)] = parsed
@@ -487,9 +510,14 @@ class ChatOrganizer:
             else:
                 for dream in value:
                     path = c['_DATA_DIR']/'dreams'/f"{dream['date']}.md"
-                    if path.exists() and path.read_text(encoding='utf-8').strip() == dream['content']:
+                    # 与 create_dream 的文件格式保持一致：统一补标题，避免整理产物丢失标题。
+                    content = dream['content']
+                    title = f"# {dream['date']} 的梦"
+                    if not content.startswith(title):
+                        content = f'{title}\n\n{content}'
+                    if path.exists() and path.read_text(encoding='utf-8').strip() == content.strip():
                         continue
-                    c['_write_text'](path, dream['content'])
+                    c['_write_text'](path, content)
 
     async def manual(self, request, payload):
         workspace = await self.workspace(request, payload.agent_id)
